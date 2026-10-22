@@ -49,14 +49,27 @@ No existing N64 decompilation exists for this game. We're flying blind through B
 | **PI DMA / Asset Loading** | **COMPLETE** |
 | **RSP Task Submission (audio + graphics)** | **COMPLETE** |
 | **Display Lists Reach RT64 (processed)** | **COMPLETE** |
-| **RT64 Renderer Integration** | **IN PROGRESS** |
-| Visible Frame Output | IN PROGRESS |
+| **RT64 Renderer Integration** | **COMPLETE** |
+| **Visible Frame Output (intro, title, menus, races)** | **COMPLETE** |
+| **Controller input + EEPROM saves** | **COMPLETE** |
+| **In-game: tournament race on Boonta Training Course** | **COMPLETE** |
+| Correct aspect/scaling (320-wide modes draw narrow) | TODO |
 | Audio Reimplementation | TODO |
-| Playable Build | THE DREAM |
+| Playable Build | IN PROGRESS |
 
-**Current Progress: Phase 7 - Display Lists Are Reaching the Renderer**
+**Current Progress: Phase 8 - In Game**
 
 *"Now THIS is podracing!"*
+
+The port now runs on current upstream N64Recomp, N64ModernRuntime and RT64 and plays from the intro through the title menu, tournament setup and into a race you can drive (no sound yet). The fixes were mostly libultra functions that had been stubbed or misidentified: `osSetThreadPri`, `osPiReadIo`, `osViSetMode`/`osViSwapBuffer`/`osViBlack`, `osViGetCurrentFramebuffer`, the EEPROM and controller functions, and `_Putfld` (sprintf). The runtime fixes needed for it are open as PRs on the sp00nznet forks of N64ModernRuntime (#1–#8) and RT64 (#1).
+
+Keyboard: Enter = A, Left Shift = B, Z = Z, Space = Start, arrows = D-pad, WASD = stick.
+
+Debug switches (environment variables): `SWE1R_DISPLAY=<n>` picks the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word.
+
+---
+
+**Previous milestone: Phase 7 - Display Lists Are Reaching the Renderer**
 
 The game now boots, **loads its assets from ROM via DMA**, spins up the RSP task pipeline, and **submits graphics display lists that RT64 accepts and processes**. Getting here meant bypassing the stubbed PI-manager thread (routing the game's `osPiStartDma` to the runtime's synchronous DMA), no-op'ing audio RSP tasks so the game proceeds to graphics, splitting a function that was being called through a pointer, un-stubbing a wrongly-stubbed string routine, and — the final piece — calling RT64's `loadUCodeGBI` before `processDisplayLists` so the renderer knows the microcode. The game thread now runs deep into per-frame logic. Still chasing the next game-logic crash and confirming pixels actually hit the screen, but the whole boot-to-render spine is connected.
 

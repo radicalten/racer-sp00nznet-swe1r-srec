@@ -33,16 +33,13 @@ stubs = [
     "cache_writeback_800887D0",
     "cache_inval_80088AD0",
     # osViSetEvent at 0x8008C090: renamed and handled by N64Recomp reimplemented_funcs
-    # func_8008C100 split: dispatch portion still stubbed (COP0 instructions)
-    "func_8008C100_dispatch",
+    # 0x8008C100/C190/C280 are osEepromLongRead/LongWrite/Probe (named in symbols.toml)
     # osGetTime/osSetCompare COP0 helpers after osGetCount (0x8008C550)
     "func_8008C560",
-    "func_8008C190",
-    "func_8008C280",
     # func_8008C390 split: tail portion still stubbed
     "func_8008C390_tail",
     # osRecvMesg, osSendMesg, osGetCount: handled by N64Recomp reimplemented_funcs
-    "func_8008C770",
+    # 0x8008C770 is osViGetCurrentFramebuffer (named in symbols.toml)
     "func_8008C7B0",
     # func_8008C930 split: exception handler still stubbed
     "func_8008C930_exception",

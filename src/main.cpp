@@ -17,6 +17,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <dbghelp.h>
+#include <tlhelp32.h>
+#include <thread>
 
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -96,7 +98,16 @@ extern "C" void __osSiRawStartDma_recomp(uint8_t* rdram, recomp_context* ctx) {
         }
         printf("[si] __osSiRawStartDma read  -> controller status written to 0x%08X\n", buf);
     } else {
-        printf("[si] __osSiRawStartDma write -> dir=%d buf=0x%08X (acked)\n", dir, buf);
+        // Log each distinct PIF command block once (debug: which SI devices the game talks to).
+        static std::vector<std::string> seen;
+        char hex[64 * 2 + 1];
+        for (int i = 0; i < 64; i++) {
+            snprintf(hex + i * 2, 3, "%02X", rdram[((buf + i) ^ 3) - 0x80000000u]);
+        }
+        if (std::find(seen.begin(), seen.end(), hex) == seen.end()) {
+            seen.push_back(hex);
+            printf("[si] PIF write ra=0x%08X: %s\n", (uint32_t)ctx->r31, hex);
+        }
     }
 
     // No real hardware to wait on — signal SI completion immediately.
@@ -227,6 +238,28 @@ bool get_input(int controller_num, uint16_t* buttons, float* x, float* y) {
     *buttons = 0;
     *x = 0.0f;
     *y = 0.0f;
+
+    // SWE1R_AUTOPRESS="28:1000,31.5:8000": hold those N64 buttons for 0.25s at each time (seconds
+    // since the first poll). For scripted test runs without a human at the keyboard.
+    static std::vector<std::pair<double, uint16_t>> script = [] {
+        std::vector<std::pair<double, uint16_t>> s;
+        if (const char* e = std::getenv("SWE1R_AUTOPRESS")) {
+            for (const char* p = e; *p; ) {
+                char* end;
+                double t = strtod(p, &end);
+                if (*end != ':') break;
+                uint16_t b = (uint16_t)strtoul(end + 1, &end, 16);
+                s.push_back({ t, b });
+                p = (*end == ',') ? end + 1 : end;
+            }
+        }
+        return s;
+    }();
+    static const uint64_t start_ticks = SDL_GetTicks64();
+    double now = (SDL_GetTicks64() - start_ticks) / 1000.0;
+    for (auto& [t, b] : script) {
+        if (now >= t && now < t + 0.25) *buttons |= b;
+    }
 
     // Basic keyboard input
     const uint8_t* keys = SDL_GetKeyboardState(nullptr);
@@ -453,6 +486,9 @@ static std::string symbolize_rva(uint32_t rva) {
 // Main
 // =============================================================================
 
+static void print_stack(HANDLE thread, CONTEXT ctx, int max_frames);
+static void print_peeks();
+
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
     fprintf(stderr, "\n[CRASH] Exception 0x%08lX at address 0x%p\n",
             ep->ExceptionRecord->ExceptionCode,
@@ -488,22 +524,96 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
         uintptr_t offset = (uintptr_t)ep->ExceptionRecord->ExceptionAddress - (uintptr_t)hMod;
         fprintf(stderr, "[CRASH] Module: %s + 0x%llX\n", modName, (unsigned long long)offset);
     }
-    // Walk the stack and symbolize each frame against the linker .map. This
-    // resolves the recompiled func_XXXX names that PDB-based SymFromAddr cannot.
-    SymInitialize(GetCurrentProcess(), NULL, TRUE);
+    fprintf(stderr, "[CRASH] Stack trace (symbolized via .map):\n");
+    print_stack(GetCurrentThread(), *ep->ContextRecord, 24);
+    print_peeks();
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// SWE1R_STACKDUMP=<seconds>: after that long, suspend every other thread and print its
+// stack. For hangs: shows where each game thread is spinning or blocked.
+static void stack_dump_thread(int seconds) {
+    Sleep(seconds * 1000);
+    DWORD self = GetCurrentThreadId(), pid = GetCurrentProcessId();
+    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    THREADENTRY32 te{ sizeof(te) };
+    for (BOOL ok = Thread32First(snap, &te); ok; ok = Thread32Next(snap, &te)) {
+        if (te.th32OwnerProcessID != pid || te.th32ThreadID == self) continue;
+        HANDLE th = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
+        if (!th) continue;
+        SuspendThread(th);
+        CONTEXT ctx{};
+        ctx.ContextFlags = CONTEXT_FULL;
+        if (GetThreadContext(th, &ctx)) {
+            fprintf(stderr, "[STACK] thread %lu:\n", te.th32ThreadID);
+            print_stack(th, ctx, 12);
+        }
+        ResumeThread(th);
+        CloseHandle(th);
+    }
+    CloseHandle(snap);
+    print_peeks();
+}
+
+// SWE1R_PEEK=0x80113690,0x...: print those RDRAM words at a stack dump or crash.
+static void print_peeks() {
+    if (const char* p = std::getenv("SWE1R_PEEK"); p && g_rdram_base) {
+        for (char* end; *p; p = (*end ? end + 1 : end)) {
+            uint32_t a = (uint32_t)strtoul(p, &end, 16);
+            fprintf(stderr, "[PEEK] 0x%08X = 0x%08X\n", a, *(uint32_t*)(g_rdram_base + (a - 0x80000000u)));
+            if (end == p) break;
+        }
+    }
+    fflush(stderr);
+}
+
+// SWE1R_WATCH=<n64 addr>@<seconds>: after that delay, arm a hardware write watchpoint (DR0, 4
+// bytes) on that RDRAM word in every thread. The first write traps into crash_handler, which
+// prints the writer's stack. For finding who corrupts game memory.
+static void watch_thread(uint32_t n64_addr, int seconds) {
+    Sleep(seconds * 1000);
+    if (!g_rdram_base) return;
+    DWORD64 native = (DWORD64)(g_rdram_base + (n64_addr - 0x80000000u));
+    fprintf(stderr, "[WATCH] armed on 0x%08X (native %p)\n", n64_addr, (void*)native);
+    DWORD self = GetCurrentThreadId(), pid = GetCurrentProcessId();
+    while (true) {  // re-arm periodically so threads created later are covered too
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        THREADENTRY32 te{ sizeof(te) };
+        for (BOOL ok = Thread32First(snap, &te); ok; ok = Thread32Next(snap, &te)) {
+            if (te.th32OwnerProcessID != pid || te.th32ThreadID == self) continue;
+            HANDLE th = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
+            if (!th) continue;
+            SuspendThread(th);
+            CONTEXT ctx{};
+            ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+            if (GetThreadContext(th, &ctx) && ctx.Dr0 != native) {
+                ctx.Dr0 = native;
+                ctx.Dr7 = 0x000D0001; // L0, RW0=write, LEN0=4 bytes
+                SetThreadContext(th, &ctx);
+            }
+            ResumeThread(th);
+            CloseHandle(th);
+        }
+        CloseHandle(snap);
+        Sleep(10);
+    }
+}
+
+// Walk a thread's stack and symbolize each frame against the linker .map (which resolves
+// the recompiled func_XXXX names) plus the PDB's C file:line.
+static void print_stack(HANDLE thread, CONTEXT ctx, int max_frames) {
+    static bool sym_init = SymInitialize(GetCurrentProcess(), NULL, TRUE);
     uintptr_t modBase = (uintptr_t)GetModuleHandle(NULL);
     STACKFRAME64 frame = {};
-    CONTEXT ctx = *ep->ContextRecord;
     frame.AddrPC.Offset = ctx.Rip;
     frame.AddrPC.Mode = AddrModeFlat;
     frame.AddrStack.Offset = ctx.Rsp;
     frame.AddrStack.Mode = AddrModeFlat;
     frame.AddrFrame.Offset = ctx.Rbp;
     frame.AddrFrame.Mode = AddrModeFlat;
-    fprintf(stderr, "[CRASH] Stack trace (symbolized via .map):\n");
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < max_frames; i++) {
         if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, GetCurrentProcess(),
-                         GetCurrentThread(), &frame, &ctx, NULL,
+                         thread, &frame, &ctx, NULL,
                          SymFunctionTableAccess64, SymGetModuleBase64, NULL))
             break;
         uint64_t pc = frame.AddrPC.Offset;
@@ -519,8 +629,6 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
         else
             fprintf(stderr, "  [%d] 0x%llX\n", i, (unsigned long long)pc);
     }
-    fflush(stderr);
-    return EXCEPTION_EXECUTE_HANDLER;
 }
 
 int main(int argc, char* argv[]) {
@@ -529,6 +637,13 @@ int main(int argc, char* argv[]) {
     setvbuf(stderr, nullptr, _IONBF, 0);
     load_map_symbols();
     SetUnhandledExceptionFilter(crash_handler);
+    if (const char* s = std::getenv("SWE1R_STACKDUMP")) {
+        std::thread(stack_dump_thread, std::atoi(s)).detach();
+    }
+    if (const char* w = std::getenv("SWE1R_WATCH")) {
+        const char* at = strchr(w, '@');
+        std::thread(watch_thread, (uint32_t)strtoul(w, nullptr, 16), at ? std::atoi(at + 1) : 0).detach();
+    }
 
     fprintf(stderr, "[DEBUG] main() entered\n");
 
@@ -545,7 +660,7 @@ int main(int argc, char* argv[]) {
     game_entry.display_name = "Star Wars Episode I: Racer";
     game_entry.game_id = u8"swe1racer";
     game_entry.mod_game_id = "swe1racer";
-    game_entry.save_type = recomp::SaveType::Eep4k;
+    game_entry.save_type = recomp::SaveType::Eep16k; // game addresses 256 EEPROM blocks (save at 0 and 0x400)
     game_entry.is_enabled = true;
     game_entry.entrypoint_address = (gpr)(int32_t)0x80000400; // Sign-extend for MEM macros
     game_entry.entrypoint = recomp_entrypoint;

@@ -3690,7 +3690,8 @@ size = 0x98000
   size = 0x70
 
   [[section.functions]]
-  name = "func_80089870"
+  # 500ms timer, pack request, SI write/read, __osContGetInitData
+  name = "osContInit"
   vram = 0x80089870
   size = 0x170
 
@@ -3708,14 +3709,15 @@ size = 0x98000
   size = 0x100
 
   [[section.functions]]
-  name = "func_80089BB0"
+  name = "osContStartReadData"
   vram = 0x80089BB0
-  size = 0x94
+  size = 0x84
 
   [[section.functions]]
-  name = "func_80089C44"
-  vram = 0x80089C44
-  size = 0x8C
+  # starts 4 instructions before its prologue (0x80089C44)
+  name = "osContGetReadData"
+  vram = 0x80089C34
+  size = 0x9C
 
   [[section.functions]]
   name = "func_80089CD0"
@@ -3879,26 +3881,40 @@ size = 0x98000
 
   # Split: func_8008C100 contains __osDispatchThread (0x50) + osGetCount (0x40)
   [[section.functions]]
-  name = "func_8008C100_dispatch"
+  # loops osEepromRead (0x80094C80) 8 bytes at a time
+  name = "osEepromLongRead"
   vram = 0x8008C100
-  size = 0x50
+  size = 0x90
 
   # NOT osGetCount — disasm is lbu/lw/sw, no mfc0, and it has zero callers.
   # The real osGetCount is 0x8008C550 (mfc0 $9). Renamed to free the name.
-  [[section.functions]]
-  name = "func_8008C150"
-  vram = 0x8008C150
-  size = 0x40
 
   [[section.functions]]
-  name = "func_8008C190"
+  # osEepromWrite (0x80094ED0) + 15ms timer per block
+  name = "osEepromLongWrite"
   vram = 0x8008C190
   size = 0xF0
 
   [[section.functions]]
-  name = "func_8008C280"
+  # __osEepStatus; type 0x8000 -> 4K, 0xC000 -> 16K
+  name = "osEepromProbe"
   vram = 0x8008C280
-  size = 0x110
+  size = 0x70
+
+  [[section.functions]]
+  name = "memcpy_8008C2F0"
+  vram = 0x8008C2F0
+  size = 0x2C
+
+  [[section.functions]]
+  name = "strlen_8008C31C"
+  vram = 0x8008C31C
+  size = 0x28
+
+  [[section.functions]]
+  name = "strchr_8008C344"
+  vram = 0x8008C344
+  size = 0x4C
 
   # Split: func_8008C390 = tail code (0x20) + osRecvMesg (0x1A0)
   [[section.functions]]
@@ -3929,7 +3945,8 @@ size = 0x98000
   size = 0x210
 
   [[section.functions]]
-  name = "func_8008C770"
+  # returns __osViCurr->framep
+  name = "osViGetCurrentFramebuffer"
   vram = 0x8008C770
   size = 0x40
 
