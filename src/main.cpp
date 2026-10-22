@@ -35,6 +35,14 @@
 #include "ultramodern/events.hpp"
 #include "ultramodern/input.hpp"
 #include "ultramodern/threads.hpp"
+#include "config.hpp"
+
+// From input.cpp
+void input_init();
+void input_handle_event(const SDL_Event& e);
+bool input_get(int port, uint16_t* buttons, float* x, float* y);
+ultramodern::input::connected_device_info_t input_device_info(int port);
+void input_set_rumble(int port, bool on);
 
 // =============================================================================
 // External declarations
@@ -179,14 +187,14 @@ ultramodern::gfx_callbacks_t::gfx_data_t create_gfx() {
 }
 
 ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::gfx_data_t) {
-    // SWE1R_DISPLAY=<n> picks the monitor (SDL display index); default is the primary.
+    // SWE1R_DISPLAY=<n> overrides the configured monitor.
     const char* disp_env = std::getenv("SWE1R_DISPLAY");
-    int disp = disp_env ? std::atoi(disp_env) : 0;
+    int disp = disp_env ? std::atoi(disp_env) : g_config.display;
+    Uint32 flags = SDL_WINDOW_RESIZABLE | (g_config.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
     g_window = SDL_CreateWindow(
         "Star Wars Episode I: Racer",
         SDL_WINDOWPOS_CENTERED_DISPLAY(disp), SDL_WINDOWPOS_CENTERED_DISPLAY(disp),
-        1280, 960,
-        SDL_WINDOW_RESIZABLE
+        g_config.windowWidth, g_config.windowHeight, flags
     );
 
     if (!g_window) {
@@ -194,7 +202,8 @@ ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::
         std::exit(1);
     }
 
-    printf("[SWE1R] Window created (1280x960)\n");
+    printf("[SWE1R] Window created (%dx%d%s)\n", g_config.windowWidth, g_config.windowHeight,
+           g_config.fullscreen ? ", fullscreen" : "");
 
     // Return native window handle
     SDL_SysWMinfo wminfo;
@@ -208,24 +217,28 @@ ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::
 }
 
 void update_gfx(ultramodern::gfx_callbacks_t::gfx_data_t) {
-    // Process SDL events
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        input_handle_event(event);
         switch (event.type) {
             case SDL_QUIT:
                 ultramodern::quit();
                 break;
-            case SDL_KEYDOWN:
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
-                    ultramodern::quit();
+            case SDL_KEYDOWN: {
+                // F11 or Alt+Enter toggles borderless fullscreen.
+                const SDL_Keysym& k = event.key.keysym;
+                if (k.sym == SDLK_F11 || (k.sym == SDLK_RETURN && (k.mod & KMOD_ALT))) {
+                    bool full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
+                    SDL_SetWindowFullscreen(g_window, full ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
                 }
                 break;
+            }
         }
     }
 }
 
 // =============================================================================
-// Input Callbacks (stub)
+// Input Callbacks (input.cpp)
 // =============================================================================
 
 void poll_input() {
@@ -233,65 +246,40 @@ void poll_input() {
 }
 
 bool get_input(int controller_num, uint16_t* buttons, float* x, float* y) {
-    if (controller_num != 0) return false;
+    bool connected = input_get(controller_num, buttons, x, y);
 
-    *buttons = 0;
-    *x = 0.0f;
-    *y = 0.0f;
-
-    // SWE1R_AUTOPRESS="28:1000,31.5:8000": hold those N64 buttons for 0.25s at each time (seconds
-    // since the first poll). For scripted test runs without a human at the keyboard.
-    static std::vector<std::pair<double, uint16_t>> script = [] {
-        std::vector<std::pair<double, uint16_t>> s;
-        if (const char* e = std::getenv("SWE1R_AUTOPRESS")) {
-            for (const char* p = e; *p; ) {
-                char* end;
-                double t = strtod(p, &end);
-                if (*end != ':') break;
-                uint16_t b = (uint16_t)strtoul(end + 1, &end, 16);
-                s.push_back({ t, b });
-                p = (*end == ',') ? end + 1 : end;
+    // SWE1R_AUTOPRESS="28:1000,31.5:8000": hold those N64 buttons on port 1 for 0.25s at each
+    // time (seconds since the first poll). For scripted test runs without a human at the keyboard.
+    if (controller_num == 0) {
+        static std::vector<std::pair<double, uint16_t>> script = [] {
+            std::vector<std::pair<double, uint16_t>> s;
+            if (const char* e = std::getenv("SWE1R_AUTOPRESS")) {
+                for (const char* p = e; *p; ) {
+                    char* end;
+                    double t = strtod(p, &end);
+                    if (*end != ':') break;
+                    uint16_t b = (uint16_t)strtoul(end + 1, &end, 16);
+                    s.push_back({ t, b });
+                    p = (*end == ',') ? end + 1 : end;
+                }
             }
+            return s;
+        }();
+        static const uint64_t start_ticks = SDL_GetTicks64();
+        double now = (SDL_GetTicks64() - start_ticks) / 1000.0;
+        for (auto& [t, b] : script) {
+            if (now >= t && now < t + 0.25) *buttons |= b;
         }
-        return s;
-    }();
-    static const uint64_t start_ticks = SDL_GetTicks64();
-    double now = (SDL_GetTicks64() - start_ticks) / 1000.0;
-    for (auto& [t, b] : script) {
-        if (now >= t && now < t + 0.25) *buttons |= b;
     }
-
-    // Basic keyboard input
-    const uint8_t* keys = SDL_GetKeyboardState(nullptr);
-
-    // N64 button mappings
-    if (keys[SDL_SCANCODE_RETURN]) *buttons |= 0x8000; // A
-    if (keys[SDL_SCANCODE_LSHIFT]) *buttons |= 0x4000; // B
-    if (keys[SDL_SCANCODE_Z])      *buttons |= 0x2000; // Z
-    if (keys[SDL_SCANCODE_SPACE])  *buttons |= 0x1000; // Start
-    if (keys[SDL_SCANCODE_UP])     *buttons |= 0x0800; // D-Up
-    if (keys[SDL_SCANCODE_DOWN])   *buttons |= 0x0400; // D-Down
-    if (keys[SDL_SCANCODE_LEFT])   *buttons |= 0x0200; // D-Left
-    if (keys[SDL_SCANCODE_RIGHT])  *buttons |= 0x0100; // D-Right
-
-    // Analog stick via WASD
-    if (keys[SDL_SCANCODE_W]) *y += 1.0f;
-    if (keys[SDL_SCANCODE_S]) *y -= 1.0f;
-    if (keys[SDL_SCANCODE_A]) *x -= 1.0f;
-    if (keys[SDL_SCANCODE_D]) *x += 1.0f;
-
-    return true;
+    return connected;
 }
 
 void set_rumble(int controller_num, bool rumble) {
-    // TODO: SDL haptic feedback
+    input_set_rumble(controller_num, rumble);
 }
 
 ultramodern::input::connected_device_info_t get_connected_device_info(int controller_num) {
-    if (controller_num == 0) {
-        return { ultramodern::input::Device::Controller, ultramodern::input::Pak::None };
-    }
-    return { ultramodern::input::Device::None, ultramodern::input::Pak::None };
+    return input_device_info(controller_num);
 }
 
 // =============================================================================
@@ -688,6 +676,8 @@ int main(int argc, char* argv[]) {
 
     // Set up config path
     recomp::register_config_path(std::filesystem::current_path());
+    g_config = load_config(std::filesystem::current_path() / "swe1racer.json");
+    input_init();
 
     // Build the configuration
     recomp::Configuration cfg{};

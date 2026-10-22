@@ -12,6 +12,52 @@
 
 #include "ultramodern/renderer_context.hpp"
 #include "librecomp/game.hpp"
+#include "config.hpp"
+
+#include <algorithm>
+#include <filesystem>
+
+// Maps a config string onto an RT64 enum value; unknown names keep `fallback`.
+template <typename E>
+static E pick(const std::string& name, std::initializer_list<std::pair<const char*, E>> options, E fallback) {
+    for (auto& [n, v] : options) if (name == n) return v;
+    fprintf(stderr, "[config] unknown value '%s', using default\n", name.c_str());
+    return fallback;
+}
+
+// Applies swe1racer.json's graphics section to RT64 (before setup, so device choices see it).
+static void apply_graphics_config(RT64::UserConfiguration& u) {
+    using U = RT64::UserConfiguration;
+    u.resolution = pick(g_config.resolution, { { "Original", U::Resolution::Original },
+        { "WindowIntegerScale", U::Resolution::WindowIntegerScale }, { "Manual", U::Resolution::Manual } }, u.resolution);
+    u.resolutionMultiplier = g_config.resolutionMultiplier;
+    u.aspectRatio = pick(g_config.aspectRatio, { { "Original", U::AspectRatio::Original },
+        { "Expand", U::AspectRatio::Expand } }, u.aspectRatio);
+    u.antialiasing = pick(g_config.antialiasing, { { "None", U::Antialiasing::None }, { "MSAA2X", U::Antialiasing::MSAA2X },
+        { "MSAA4X", U::Antialiasing::MSAA4X }, { "MSAA8X", U::Antialiasing::MSAA8X } }, u.antialiasing);
+    u.filtering = pick(g_config.filtering, { { "Nearest", U::Filtering::Nearest }, { "Linear", U::Filtering::Linear },
+        { "AntiAliasedPixelScaling", U::Filtering::AntiAliasedPixelScaling } }, u.filtering);
+    u.refreshRate = pick(g_config.refreshRate, { { "Original", U::RefreshRate::Original },
+        { "Display", U::RefreshRate::Display } }, u.refreshRate);
+    u.developerMode = g_config.developerMode;
+    u.validate();
+}
+
+// Loads every .rtz and folder in texture-packs/ (alphabetical) as RT64 replacement packs.
+static void load_texture_packs(RT64::Application& app) {
+    const std::filesystem::path dir = std::filesystem::current_path() / "texture-packs";
+    std::filesystem::create_directories(dir);
+    std::vector<RT64::ReplacementDirectory> packs;
+    for (auto& e : std::filesystem::directory_iterator(dir)) {
+        if (e.is_directory() || e.path().extension() == ".rtz") packs.emplace_back(e.path());
+    }
+    std::sort(packs.begin(), packs.end(), [](auto& a, auto& b) { return a.dirOrZipPath < b.dirOrZipPath; });
+    if (packs.empty()) return;
+    for (auto& p : packs) printf("[SWE1R] texture pack: %s\n", p.dirOrZipPath.filename().string().c_str());
+    if (!app.textureCache->loadReplacementDirectories(packs)) {
+        fprintf(stderr, "[SWE1R] failed to load texture packs\n");
+    }
+}
 
 // Static buffers for RT64 Core (RSP memory, not used in HLE mode but required)
 static uint8_t s_dmem[0x1000];
@@ -93,11 +139,12 @@ public:
         RT64::ApplicationConfiguration app_config;
         app_config.appId = "swe1racer";
         app_config.detectDataPath = true;
-        app_config.useConfigurationFile = true;
+        app_config.useConfigurationFile = false; // settings come from swe1racer.json
 
         // Create the RT64 Application
         printf("[SWE1R] Creating RT64 application...\n");
         app_ = std::make_unique<RT64::Application>(core, app_config);
+        apply_graphics_config(app_->userConfig);
 
         // Run setup (creates graphics device, swap chain, shader caches, etc.)
         auto result = app_->setup(window_handle.thread_id);
@@ -105,11 +152,9 @@ public:
         switch (result) {
         case RT64::Application::SetupResult::Success:
             printf("[SWE1R] RT64 initialized successfully\n");
-            // Races use a 640-stride interlaced VI mode with xscale 0.5: a 320x480 image the VI
-            // stretches to 4:3. "Remove black borders" sizes the output from that 320x480 and
-            // ignores the stretch (portrait image), so present the plain 4:3 TV frame instead.
-            app_->enhancementConfig.presentation.removeBlackBorders = false;
-            app_->updateEnhancementConfig();
+            if (g_config.texturePacks) {
+                load_texture_packs(*app_);
+            }
             is_valid_ = true;
             break;
         case RT64::Application::SetupResult::DynamicLibrariesNotFound:

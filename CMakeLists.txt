@@ -66,6 +66,8 @@ add_executable(SWE1Racer
     src/section_table.cpp
     src/rt64_render_context.cpp
     src/audio.cpp
+    src/config.cpp
+    src/input.cpp
 )
 
 target_include_directories(SWE1Racer PRIVATE

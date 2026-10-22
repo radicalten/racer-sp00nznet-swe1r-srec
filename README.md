@@ -56,6 +56,10 @@ No existing N64 decompilation exists for this game. We're flying blind through B
 | **RT64 Renderer Integration** | **COMPLETE** |
 | **Visible Frame Output (intro, title, menus, races)** | **COMPLETE** |
 | **Controller input + EEPROM saves** | **COMPLETE** |
+| **Controllers (SDL), 4 ports, rebinding, config file** | **COMPLETE** |
+| **High-res output (RT64 resolution scale, MSAA)** | **COMPLETE** |
+| Widescreen | EXPERIMENTAL |
+| Texture packs (RT64 format) | SUPPORTED |
 | **In-game: tournament race on Boonta Training Course** | **COMPLETE** |
 | **Correct 4:3 presentation in every VI mode** | **COMPLETE** |
 | Audio Reimplementation | TODO |
@@ -67,9 +71,7 @@ No existing N64 decompilation exists for this game. We're flying blind through B
 
 The port now runs on current upstream N64Recomp, N64ModernRuntime and RT64 and plays from the intro through the title menu, tournament setup and into a race you can drive (no sound yet). The fixes were mostly libultra functions that had been stubbed or misidentified: `osSetThreadPri`, `osPiReadIo`, `osViSetMode`/`osViSwapBuffer`/`osViBlack`, `osViGetCurrentFramebuffer`, the EEPROM and controller functions, and `_Putfld` (sprintf). The runtime fixes needed for it are open as PRs on the sp00nznet forks of N64ModernRuntime (#1–#8) and RT64 (#1).
 
-Keyboard: Enter = A, Left Shift = B, Z = Z, Space = Start, arrows = D-pad, WASD = stick.
-
-Debug switches (environment variables): `SWE1R_DISPLAY=<n>` picks the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word.
+Controls, settings and texture packs: see [Playing](#playing).
 
 ## Screenshots
 
@@ -184,26 +186,67 @@ make progress
 
 ### Building
 
+The build expects three sibling checkouts next to this repo: [N64Recomp](https://github.com/sp00nznet/N64Recomp), [N64ModernRuntime](https://github.com/sp00nznet/N64ModernRuntime) and [rt64](https://github.com/sp00nznet/rt64) (the sp00nznet forks, which carry the fixes this port needs), plus SDL2 from vcpkg at `C:\vcpkg`.
+
 ```bash
+# 0. Toolkit checkouts, side by side with this repo
+git clone --recursive https://github.com/sp00nznet/N64Recomp ../N64Recomp
+git clone --recursive https://github.com/sp00nznet/N64ModernRuntime ../N64ModernRuntime
+git clone --recursive https://github.com/sp00nznet/rt64 ../rt64
+vcpkg install sdl2:x64-windows
+
 # 1. Build N64Recomp (the recompiler tool)
-cd /path/to/N64Recomp
-cmake -B build -G "Visual Studio 17 2022"
-cmake --build build --config Release --target N64RecompCLI
+cmake -S ../N64Recomp -B ../N64Recomp/build -G "Visual Studio 17 2022" -A x64
+cmake --build ../N64Recomp/build --config Release --target N64RecompCLI
 
-# 2. Recompile the game (MIPS -> C)
-cd /path/to/racer
-make recomp N64RECOMP=/path/to/N64Recomp/build/Release/N64Recomp.exe
-
-# 3. Generate the function lookup table
+# 2. Recompile the game (MIPS -> C) into RecompiledFuncs/ (generated, never committed)
+mkdir RecompiledFuncs
+../N64Recomp/build/Release/N64Recomp.exe recomp.toml
+python tools/fix_fallthroughs.py
+python tools/post_recomp_patches.py
 python tools/gen_lookup_table.py
 
-# 4. Build the native executable
-cmake -B build -G "Visual Studio 17 2022"
-cmake --build build --config Release
+# 3. Build the native executable
+cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config RelWithDebInfo
 
-# 5. Run it!
-build/Release/SWE1Racer.exe
+# 4. Put your ROM next to the exe as swe1racer.z64 and run it
+cp baserom.z64 build/RelWithDebInfo/swe1racer.z64
+cd build/RelWithDebInfo && ./SWE1Racer.exe
 ```
+
+## Playing
+
+Default keyboard: arrows / WASD = stick, Space or Enter = A (throttle), Left Shift = B, Z = Z, Q / E = L / R, numpad 8/2/4/6 = C buttons, Escape or P = Start. F11 or Alt+Enter toggles fullscreen.
+
+Controllers (XInput, DualShock, Switch Pro and anything else SDL knows) are picked up automatically and can be plugged in at any time: A or right trigger = A, X = B, left trigger = Z, bumpers = L / R, right stick or Y/B = C buttons, Start = Start. Controller 1 drives player 1, controller 2 player 2, and so on; the keyboard also drives player 1. The N64 game itself supports at most 2 players (split screen).
+
+### Configuration
+
+`swe1racer.json` is created next to the exe on first run and lists every option:
+
+| Section | Option | Values |
+|---|---|---|
+| graphics | `resolution` | `WindowIntegerScale` (default), `Original` (native 320x240), `Manual` |
+| graphics | `resolutionMultiplier` | scale used with `Manual`, e.g. `4.0` |
+| graphics | `antialiasing` | `None`, `MSAA2X`, `MSAA4X` (default), `MSAA8X` |
+| graphics | `filtering` | `AntiAliasedPixelScaling` (default), `Linear`, `Nearest` |
+| graphics | `aspectRatio` | `Original` (4:3, default) or `Expand` (experimental widescreen: the 3D widens, but the game's full-screen blur overlay stays 4:3) |
+| graphics | `refreshRate` | `Original` (60 Hz) or `Display` |
+| graphics | `fullscreen`, `windowWidth`, `windowHeight`, `display` | window settings |
+| graphics | `texturePacks` | load packs from `texture-packs/` (default `true`) |
+| graphics | `developerMode` | RT64 inspector, including texture dumping |
+| input | `deadzone` | stick deadzone, `0.15` by default |
+| input | `players[0..3].device` | `auto` (default), `controller` (with `controller`: index), `keyboard`, `none` |
+| input | `controllerBindings` / `keyboardBindings` | N64 button name to a list of SDL inputs, e.g. `"A": ["a", "+righttrigger"]` or `"A": ["Space"]` |
+
+### Texture packs
+
+Drop RT64 texture packs (`.rtz` files or folders) into `texture-packs/` next to the exe; they load in alphabetical order. No HD pack for the N64 version of Racer is known to exist yet. Packs made for other emulators (Rice / GLideN64 `hires_texture` format) can be converted with RT64's `texture_hasher` tool from a texture dump; see RT64's [TEXTURE-PACKS.md](https://github.com/rt64/rt64/blob/main/TEXTURE-PACKS.md).
+
+### Debug switches
+
+Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word.
 
 ## Project Structure
 
