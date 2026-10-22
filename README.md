@@ -17,6 +17,10 @@
    \____________________________/
 ```
 
+<p align="center">
+  <img src="docs/screenshots/hero.gif" alt="Anakin racing the Boonta Training Course in the recompiled build" width="480">
+</p>
+
 ## What is this?
 
 This is a **static recompilation** project for *Star Wars Episode I: Racer* on the Nintendo 64, using [N64Recomp](https://github.com/N64Recomp/N64Recomp). The goal: take the original N64 binary and recompile it into native PC code, so you can podrace at modern resolutions and framerates without emulation.
@@ -53,7 +57,7 @@ No existing N64 decompilation exists for this game. We're flying blind through B
 | **Visible Frame Output (intro, title, menus, races)** | **COMPLETE** |
 | **Controller input + EEPROM saves** | **COMPLETE** |
 | **In-game: tournament race on Boonta Training Course** | **COMPLETE** |
-| Correct aspect/scaling (320-wide modes draw narrow) | TODO |
+| **Correct 4:3 presentation in every VI mode** | **COMPLETE** |
 | Audio Reimplementation | TODO |
 | Playable Build | IN PROGRESS |
 
@@ -66,6 +70,17 @@ The port now runs on current upstream N64Recomp, N64ModernRuntime and RT64 and p
 Keyboard: Enter = A, Left Shift = B, Z = Z, Space = Start, arrows = D-pad, WASD = stick.
 
 Debug switches (environment variables): `SWE1R_DISPLAY=<n>` picks the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word.
+
+## Screenshots
+
+Captured from the recompiled build (RT64, D3D12), 2026-10-22.
+
+| | | |
+|:-:|:-:|:-:|
+| ![Title screen](docs/screenshots/title.png) | ![Watto's shop](docs/screenshots/watto-shop.png) | ![Select player](docs/screenshots/select-player.png) |
+| Title menu | Watto's shop | Select player |
+| ![Tournament](docs/screenshots/tournament.png) | ![Racing the Boonta Training Course](docs/screenshots/race-1.png) | ![Racing, later in the lap](docs/screenshots/race-2.png) |
+| Tournament: Amateur circuit | Boonta Training Course | Same race, later in the lap |
 
 ---
 

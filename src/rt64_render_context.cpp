@@ -105,6 +105,11 @@ public:
         switch (result) {
         case RT64::Application::SetupResult::Success:
             printf("[SWE1R] RT64 initialized successfully\n");
+            // Races use a 640-stride interlaced VI mode with xscale 0.5: a 320x480 image the VI
+            // stretches to 4:3. "Remove black borders" sizes the output from that 320x480 and
+            // ignores the stretch (portrait image), so present the plain 4:3 TV frame instead.
+            app_->enhancementConfig.presentation.removeBlackBorders = false;
+            app_->updateEnhancementConfig();
             is_valid_ = true;
             break;
         case RT64::Application::SetupResult::DynamicLibrariesNotFound:
@@ -174,9 +179,10 @@ public:
 
         screen_count_++;
         if (screen_count_ <= 5 || (screen_count_ % 60 == 0)) {
-            printf("[SWE1R] update_screen #%u VI origin=0x%08X width=%u hstart=0x%08X status=0x%08X xscale=0x%X\n",
+            printf("[SWE1R] update_screen #%u VI origin=0x%08X width=%u hstart=0x%08X vstart=0x%08X status=0x%08X xscale=0x%X yscale=0x%X vsync=0x%X hsync=0x%X\n",
                    screen_count_, vi_regs_->VI_ORIGIN_REG, vi_regs_->VI_WIDTH_REG,
-                   vi_regs_->VI_H_START_REG, vi_regs_->VI_STATUS_REG, vi_regs_->VI_X_SCALE_REG);
+                   vi_regs_->VI_H_START_REG, vi_regs_->VI_V_START_REG, vi_regs_->VI_STATUS_REG,
+                   vi_regs_->VI_X_SCALE_REG, vi_regs_->VI_Y_SCALE_REG, vi_regs_->VI_V_SYNC_REG, vi_regs_->VI_H_SYNC_REG);
         }
 
         app_->updateScreen();
