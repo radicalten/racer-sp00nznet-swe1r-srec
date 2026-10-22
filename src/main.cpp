@@ -168,9 +168,12 @@ ultramodern::gfx_callbacks_t::gfx_data_t create_gfx() {
 }
 
 ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::gfx_data_t) {
+    // SWE1R_DISPLAY=<n> picks the monitor (SDL display index); default is the primary.
+    const char* disp_env = std::getenv("SWE1R_DISPLAY");
+    int disp = disp_env ? std::atoi(disp_env) : 0;
     g_window = SDL_CreateWindow(
         "Star Wars Episode I: Racer",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED_DISPLAY(disp), SDL_WINDOWPOS_CENTERED_DISPLAY(disp),
         1280, 960,
         SDL_WINDOW_RESIZABLE
     );
@@ -272,7 +275,7 @@ void gfx_init_callback() {
     // This must happen after start() has begun, not before, so the VI
     // thread gets a chance to set dummy VI state before is_game_started() is true.
     std::u8string game_id = u8"swe1racer";
-    recomp::start_game(game_id);
+    recomp::start_game(game_id, ""); // no game modes (a mod-system feature)
     printf("[SWE1R] Game started\n");
 }
 
@@ -506,7 +509,11 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep) {
         uint64_t pc = frame.AddrPC.Offset;
         std::string name;
         if (pc >= modBase) name = symbolize_rva((uint32_t)(pc - modBase));
-        if (!name.empty())
+        IMAGEHLP_LINE64 line{ sizeof(IMAGEHLP_LINE64) };
+        DWORD disp = 0;
+        if (SymGetLineFromAddr64(GetCurrentProcess(), pc, &disp, &line))
+            fprintf(stderr, "  [%d] %s   (%s:%lu)\n", i, name.c_str(), line.FileName, line.LineNumber);
+        else if (!name.empty())
             fprintf(stderr, "  [%d] %s   (rva 0x%X)\n", i, name.c_str(),
                     (uint32_t)(pc - modBase));
         else
@@ -535,6 +542,7 @@ int main(int argc, char* argv[]) {
     recomp::GameEntry game_entry{};
     game_entry.rom_hash = SWE1R_ROM_HASH;
     game_entry.internal_name = "STAR WARS EP1 RACER";
+    game_entry.display_name = "Star Wars Episode I: Racer";
     game_entry.game_id = u8"swe1racer";
     game_entry.mod_game_id = "swe1racer";
     game_entry.save_type = recomp::SaveType::Eep4k;

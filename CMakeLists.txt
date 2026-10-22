@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.20)
 
+# Must come before project() to take effect.
+set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE PATH
+    "vcpkg toolchain file")
+
 project(SWE1Racer VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -12,8 +16,6 @@ set(N64_MODERN_RUNTIME_DIR "${CMAKE_SOURCE_DIR}/../N64ModernRuntime" CACHE PATH
     "Path to N64ModernRuntime")
 set(RT64_DIR "${CMAKE_SOURCE_DIR}/../rt64" CACHE PATH
     "Path to RT64 renderer")
-set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE PATH
-    "vcpkg toolchain file")
 
 # =============================================================================
 # SDL2 (via vcpkg)
@@ -33,6 +35,9 @@ add_subdirectory(${RT64_DIR} ${CMAKE_BINARY_DIR}/rt64)
 # N64ModernRuntime (librecomp + ultramodern)
 # =============================================================================
 add_subdirectory(${N64_MODERN_RUNTIME_DIR} ${CMAKE_BINARY_DIR}/N64ModernRuntime)
+# The game's own libultra pokes VI/AI/PI/MI registers (0xA4000000+) directly;
+# commit memory past kseg0 so those accesses land in scratch memory.
+target_compile_definitions(librecomp PUBLIC RECOMP_MEM_SIZE_MB=640)
 
 # =============================================================================
 # Recompiled Functions Library
@@ -92,4 +97,8 @@ target_link_libraries(SWE1Racer PRIVATE
 if(WIN32)
     target_link_libraries(SWE1Racer PRIVATE dxgi d3d12 d3dcompiler dbghelp)
     target_link_options(SWE1Racer PRIVATE /MAP)
+    # RT64 loads the DXC runtime next to the exe; without it setup() silently skips init.
+    add_custom_command(TARGET SWE1Racer POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${RT64_DIR}/src/contrib/dxc/bin/x64/dxil.dll ${RT64_DIR}/src/contrib/dxc/bin/x64/dxcompiler.dll
+        $<TARGET_FILE_DIR:SWE1Racer>)
 endif()

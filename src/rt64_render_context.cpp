@@ -166,12 +166,17 @@ public:
         app_->processDisplayLists(rdram_, dl_address, 0, true);
     }
 
+    // ponytail: only sent before the game starts (dummy VI frames); nothing to draw yet.
+    void send_dummy_workload(uint32_t /*fb_address*/) override {}
+
     void update_screen() override {
         if (!app_ || !is_valid_) return;
 
         screen_count_++;
         if (screen_count_ <= 5 || (screen_count_ % 60 == 0)) {
-            printf("[SWE1R] update_screen #%u\n", screen_count_);
+            printf("[SWE1R] update_screen #%u VI origin=0x%08X width=%u hstart=0x%08X status=0x%08X xscale=0x%X\n",
+                   screen_count_, vi_regs_->VI_ORIGIN_REG, vi_regs_->VI_WIDTH_REG,
+                   vi_regs_->VI_H_START_REG, vi_regs_->VI_STATUS_REG, vi_regs_->VI_X_SCALE_REG);
         }
 
         app_->updateScreen();

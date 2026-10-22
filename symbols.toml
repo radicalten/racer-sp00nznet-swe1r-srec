@@ -2006,7 +2006,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_80044370"
   vram = 0x80044370
-  size = 0xAC
+  size = 0xA4
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_80044414"
+  vram = 0x80044414
+  size = 0x8
 
   [[section.functions]]
   name = "func_8004441C"
@@ -2026,7 +2032,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_80045004"
   vram = 0x80045004
-  size = 0x310
+  size = 0x140
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_80045144"
+  vram = 0x80045144
+  size = 0x1D0
 
   [[section.functions]]
   name = "func_80045314"
@@ -2391,7 +2403,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_80053300"
   vram = 0x80053300
-  size = 0x84
+  size = 0x7C
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_8005337C"
+  vram = 0x8005337C
+  size = 0x8
 
   [[section.functions]]
   name = "func_80053384"
@@ -2456,7 +2474,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_8005C210"
   vram = 0x8005C210
-  size = 0x9C8
+  size = 0x15C
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_8005C36C"
+  vram = 0x8005C36C
+  size = 0x86C
 
   [[section.functions]]
   # Split from func_8005C210: 0x8005CBD8 is a real function (prologue
@@ -2569,12 +2593,24 @@ size = 0x98000
   [[section.functions]]
   name = "func_80060DE4"
   vram = 0x80060DE4
-  size = 0x1490
+  size = 0x148C
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_80062270"
+  vram = 0x80062270
+  size = 0x4
 
   [[section.functions]]
   name = "func_80062274"
   vram = 0x80062274
-  size = 0xA0C
+  size = 0xA04
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_80062C78"
+  vram = 0x80062C78
+  size = 0x8
 
   [[section.functions]]
   name = "func_80062C80"
@@ -2654,7 +2690,19 @@ size = 0x98000
   [[section.functions]]
   name = "func_80064F1C"
   vram = 0x80064F1C
-  size = 0x774
+  size = 0x150
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_8006506C"
+  vram = 0x8006506C
+  size = 0x8
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_80065074"
+  vram = 0x80065074
+  size = 0x61C
 
   [[section.functions]]
   name = "func_80065690"
@@ -2874,7 +2922,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_8006FDE4"
   vram = 0x8006FDE4
-  size = 0x5BC
+  size = 0x104
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_8006FEE8"
+  vram = 0x8006FEE8
+  size = 0x4B8
 
   [[section.functions]]
   name = "func_800703A0"
@@ -3019,7 +3073,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_8007ACEC"
   vram = 0x8007ACEC
-  size = 0x2FC
+  size = 0x2F4
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_8007AFE0"
+  vram = 0x8007AFE0
+  size = 0x8
 
   [[section.functions]]
   name = "func_8007AFE8"
@@ -3094,7 +3154,13 @@ size = 0x98000
   [[section.functions]]
   name = "func_8007C074"
   vram = 0x8007C074
-  size = 0x350
+  size = 0x348
+
+  [[section.functions]]
+  # entry reached through the function-pointer table at 0x800A2000
+  name = "func_8007C3BC"
+  vram = 0x8007C3BC
+  size = 0x8
 
   [[section.functions]]
   name = "func_8007C3C4"
@@ -3667,19 +3733,28 @@ size = 0x98000
   size = 0x4A0
 
   [[section.functions]]
-  name = "func_8008A2F0"
+  # libultra VI: sets __osViNext->modep, state = MODE_UPDATED
+  name = "osViSetMode"
   vram = 0x8008A2F0
   size = 0x70
 
   [[section.functions]]
-  name = "func_8008A360"
+  # sets __osViNext->framep, state |= BUFFER_UPDATED
+  name = "osViSwapBuffer"
   vram = 0x8008A360
   size = 0x50
 
   [[section.functions]]
-  name = "func_8008A3B0"
+  # toggles __osViNext state BLACK (0x20)
+  name = "osViBlack"
   vram = 0x8008A3B0
-  size = 0x248
+  size = 0x70
+
+  [[section.functions]]
+  # separate function after osViBlack
+  name = "func_8008A420"
+  vram = 0x8008A420
+  size = 0x1D8
 
   [[section.functions]]
   name = "func_8008A5F8"
@@ -3697,9 +3772,15 @@ size = 0x98000
   size = 0x5C
 
   [[section.functions]]
-  name = "func_8008A710"
+  # osPiReadIo: __osPiGetAccess, __osPiRawReadIo, __osPiRelAccess (0x40 bytes)
+  name = "osPiReadIo"
   vram = 0x8008A710
-  size = 0x5C8
+  size = 0x40
+
+  [[section.functions]]
+  name = "func_8008A750"
+  vram = 0x8008A750
+  size = 0x588
 
   [[section.functions]]
   name = "func_8008ACD8"
@@ -3784,7 +3865,8 @@ size = 0x98000
   size = 0x1F0
 
   [[section.functions]]
-  name = "func_8008BFB0"
+  # osSetThreadPri: idle thread drops itself to priority 0 before spinning (0x8002F72C)
+  name = "osSetThreadPri"
   vram = 0x8008BFB0
   size = 0xE0
 
@@ -3901,7 +3983,8 @@ size = 0x98000
   size = 0xC0
 
   [[section.functions]]
-  name = "osViSetMode"
+  # not osViSetMode (no callers; calls 0x80095AA0)
+  name = "func_8008D510"
   vram = 0x8008D510
   size = 0x44
 

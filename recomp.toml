@@ -107,7 +107,7 @@ stubs = [
     "func_80092560",
     "func_800926A0",
     "func_800928F0",
-    "func_80092B10",
+    # func_80092B10 is _Putfld (pure C, used by _Printf/sprintf): must NOT be stubbed
     "pi_create_access_queue",
     "pi_rel_access",
     "pi_read_io",
