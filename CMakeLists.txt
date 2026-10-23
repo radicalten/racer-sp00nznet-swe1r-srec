@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-# Must come before project() to take effect.
-set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE PATH
-    "vcpkg toolchain file")
-
-project(SWE1Racer VERSION 0.1.0 LANGUAGES C CXX)
+project(SWE1Racer VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -12,22 +8,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # =============================================================================
 # Options
 # =============================================================================
-set(N64_MODERN_RUNTIME_DIR "${CMAKE_SOURCE_DIR}/../N64ModernRuntime" CACHE PATH
-    "Path to N64ModernRuntime")
-set(RT64_DIR "${CMAKE_SOURCE_DIR}/../rt64" CACHE PATH
-    "Path to RT64 renderer")
+# Toolkits: deps/ when tools/setup.ps1 fetched them there, else sibling checkouts.
+foreach(dep N64ModernRuntime rt64)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/deps/${dep}/CMakeLists.txt")
+        set(default_${dep} "${CMAKE_SOURCE_DIR}/deps/${dep}")
+    else()
+        set(default_${dep} "${CMAKE_SOURCE_DIR}/../${dep}")
+    endif()
+endforeach()
+set(N64_MODERN_RUNTIME_DIR "${default_N64ModernRuntime}" CACHE PATH "Path to N64ModernRuntime")
+set(RT64_DIR "${default_rt64}" CACHE PATH "Path to RT64 renderer")
 
 # =============================================================================
-# SDL2 (via vcpkg)
+# SDL2: the Windows build RT64 ships (RT64 links it by bare name from this folder)
 # =============================================================================
-find_package(SDL2 CONFIG REQUIRED)
+set(SDL2_DIR_WIN "${RT64_DIR}/src/contrib/mupen64plus-win32-deps/SDL2-2.26.3")
+add_library(SDL2::SDL2 SHARED IMPORTED)
+set_target_properties(SDL2::SDL2 PROPERTIES
+    IMPORTED_LOCATION "${SDL2_DIR_WIN}/lib/x64/SDL2.dll"
+    IMPORTED_IMPLIB "${SDL2_DIR_WIN}/lib/x64/SDL2.lib"
+    INTERFACE_INCLUDE_DIRECTORIES "${SDL2_DIR_WIN}/include")
+add_library(SDL2::SDL2main STATIC IMPORTED)
+set_target_properties(SDL2::SDL2main PROPERTIES IMPORTED_LOCATION "${SDL2_DIR_WIN}/lib/x64/SDL2main.lib")
 
 # =============================================================================
 # RT64 Renderer
 # =============================================================================
-# RT64 links SDL2 by bare name; ensure vcpkg's lib dir is on the search path
-link_directories("C:/vcpkg/installed/x64-windows/lib")
-link_directories("C:/vcpkg/installed/x64-windows/lib/manual-link")
 set(RT64_STATIC ON CACHE BOOL "Build RT64 as static library" FORCE)
 add_subdirectory(${RT64_DIR} ${CMAKE_BINARY_DIR}/rt64)
 
@@ -102,5 +108,6 @@ if(WIN32)
     # RT64 loads the DXC runtime next to the exe; without it setup() silently skips init.
     add_custom_command(TARGET SWE1Racer POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${RT64_DIR}/src/contrib/dxc/bin/x64/dxil.dll ${RT64_DIR}/src/contrib/dxc/bin/x64/dxcompiler.dll
+        ${SDL2_DIR_WIN}/lib/x64/SDL2.dll
         $<TARGET_FILE_DIR:SWE1Racer>)
 endif()

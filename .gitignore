@@ -31,3 +31,13 @@ desktop.ini
 
 # Claude Code
 .claude/
+
+# Setup (tools/setup.ps1): logs, fetched toolkits, the launcher it makes
+logs/
+deps/
+* (recomp).cmd
+
+# Written in the working directory on first run
+swe1racer.json
+netplay/
+saves/
