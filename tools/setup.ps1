@@ -108,8 +108,8 @@ $match = $null
 $searchDirs = @($Root) + $(if ($Game) { @($Game) } else { @() })
 foreach ($dir in $searchDirs) {
     # The folder itself, then its direct subfolders (Windows PowerShell ignores -Depth with -Include).
-    $files = @(Get-ChildItem -Path $dir -File -ErrorAction SilentlyContinue) +
-             @(Get-ChildItem -Path $dir -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -Path $_.FullName -File -ErrorAction SilentlyContinue })
+    $files = @(Get-ChildItem -LiteralPath $dir -File -ErrorAction SilentlyContinue) +
+             @(Get-ChildItem -LiteralPath $dir -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -LiteralPath $_.FullName -File -ErrorAction SilentlyContinue })
     foreach ($f in $files | Where-Object { $_.Extension -in ".z64", ".n64", ".v64" }) {
         $h = Read-Header $f.FullName
         if (-not $h) { continue }
@@ -122,7 +122,7 @@ foreach ($dir in $searchDirs) {
 if (-not $match) {
     Stop-Setup "No Racer ROM found. Put your USA .z64 of Star Wars Episode I: Racer in this folder (or pass -Game <folder>), then run Setup again. Byte-swapped .v64/.n64 dumps need converting to .z64 first."
 }
-if ($match -ne $target) { Copy-Item $match $target -Force }
+if ($match -ne $target) { Copy-Item -LiteralPath $match -Destination $target -Force }
 Write-Host "  $match"
 
 # ---------------------------------------------------------------------------------------------
