@@ -27,6 +27,7 @@ MARKER = "@post-recomp-redirect"
 # func name -> ultramodern reimplementation to call instead
 REDIRECTS = {
     "func_80087D70": "osPiStartDma_recomp",   # game osPiStartDma -> bypass dead PI manager
+    "racer_osGetCount": "racer_get_count",    # game clock -> main.cpp (virtual in netplay/deterministic mode)
 }
 
 def main():
@@ -46,6 +47,8 @@ def main():
                 lookahead = "\n".join(lines[i:i+8])
                 if MARKER in lookahead:
                     i += 1; continue
+                # declare the target just above the function (it lives outside the generated code)
+                out.insert(len(out) - 1, f"void {target}(uint8_t* rdram, recomp_context* ctx);")
                 # emit decls (next 2 non-empty lines are the hi/lo + c1cs decls)
                 j = i + 1
                 while j < len(lines) and lines[j].strip() in (

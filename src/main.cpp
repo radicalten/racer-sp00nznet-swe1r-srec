@@ -67,6 +67,15 @@ extern void swe1r_set_frequency(uint32_t freq);
 // RDRAM base — captured in on_game_init so the crash handler can translate
 // native fault addresses back into N64 virtual addresses.
 static uint8_t* g_rdram_base = nullptr;
+uint8_t* g_rdram_base_for_det = nullptr; // read by determinism.cpp
+
+// From determinism.cpp
+bool det_enabled();
+uint64_t det_frame();
+void det_start(void (*then)(uint64_t));
+
+// --headless: hidden window, nothing on screen (rendering still runs).
+static bool g_headless = false;
 
 // SI DMA: the game's __osSiRawStartDma is COP0/MMIO based and can't be
 // recompiled. It moves a 64-byte block between DRAM and PIF RAM and raises an
@@ -193,6 +202,7 @@ ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::
     const char* disp_env = std::getenv("SWE1R_DISPLAY");
     int disp = disp_env ? std::atoi(disp_env) : g_config.display;
     Uint32 flags = SDL_WINDOW_RESIZABLE | (g_config.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+    if (g_headless) flags = SDL_WINDOW_HIDDEN;
     g_window = SDL_CreateWindow(
         "Star Wars Episode I: Racer",
         SDL_WINDOWPOS_CENTERED_DISPLAY(disp), SDL_WINDOWPOS_CENTERED_DISPLAY(disp),
@@ -247,7 +257,24 @@ void poll_input() {
     // SDL event polling is done in update_gfx
 }
 
+// From netplay.cpp
+bool netplay_active();
+std::filesystem::path netplay_setup(int argc, char** argv, const std::filesystem::path& base, int delay);
+bool netplay_get_input(int port, uint16_t* buttons, float* x, float* y);
+ultramodern::input::connected_device_info_t netplay_device_info(int port);
+
+bool sample_local_input(uint16_t* buttons, float* x, float* y);
+
 bool get_input(int controller_num, uint16_t* buttons, float* x, float* y) {
+    // Netplay: the synchronized inputs of both players, sampled once per retrace.
+    if (netplay_active()) return netplay_get_input(controller_num, buttons, x, y);
+    if (controller_num == 0) return sample_local_input(buttons, x, y);
+    return input_get(controller_num, buttons, x, y);
+}
+
+// Player 1's local input (keyboard/controller plus SWE1R_AUTOPRESS). Netplay samples it per retrace.
+bool sample_local_input(uint16_t* buttons, float* x, float* y) {
+    const int controller_num = 0;
     bool connected = input_get(controller_num, buttons, x, y);
 
     // SWE1R_AUTOPRESS="28:1000,31.5:8000": hold those N64 buttons on port 1 for 0.25s at each
@@ -268,7 +295,8 @@ bool get_input(int controller_num, uint16_t* buttons, float* x, float* y) {
             return s;
         }();
         static const uint64_t start_ticks = SDL_GetTicks64();
-        double now = (SDL_GetTicks64() - start_ticks) / 1000.0;
+        // In deterministic mode the script counts frames (60 per second), so runs replay exactly.
+        double now = det_enabled() ? det_frame() / 60.0 : (SDL_GetTicks64() - start_ticks) / 1000.0;
         for (auto& [t, b] : script) {
             if (now >= t && now < t + 0.25) *buttons |= b;
         }
@@ -281,6 +309,7 @@ void set_rumble(int controller_num, bool rumble) {
 }
 
 ultramodern::input::connected_device_info_t get_connected_device_info(int controller_num) {
+    if (netplay_active()) return netplay_device_info(controller_num);
     return input_device_info(controller_num);
 }
 
@@ -329,6 +358,7 @@ void on_game_init(uint8_t* rdram, recomp_context* ctx) {
     // Capture the RDRAM base so the crash handler can map native fault
     // addresses back to N64 virtual addresses.
     g_rdram_base = rdram;
+    g_rdram_base_for_det = rdram;
 
     // The game's boot code at 0x8008D284 initializes the PI (cartridge ROM) handle
     // and stores it at globals 0x800A7BC0 and 0x800A7FC0. That code is stubbed
@@ -622,6 +652,10 @@ static void print_stack(HANDLE thread, CONTEXT ctx, int max_frames) {
 }
 
 int main(int argc, char* argv[]) {
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "--headless") g_headless = true;
+    }
+    if (const char* h = std::getenv("SWE1R_HEADLESS"); h && *h == '1') g_headless = true;
     // Force unbuffered output so we see prints before crashes
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
@@ -677,9 +711,10 @@ int main(int argc, char* argv[]) {
            num_sections, section_table[0].num_funcs);
 
     // Set up config path
-    recomp::register_config_path(std::filesystem::current_path());
     g_config = load_config(std::filesystem::current_path() / "swe1racer.json");
     input_init();
+    // --host / --join: handshake now; netplay keeps its ROM copy and shared save in netplay/.
+    recomp::register_config_path(netplay_setup(argc, argv, std::filesystem::current_path(), g_config.netplayInputDelay));
 
     // Build the configuration
     recomp::Configuration cfg{};
@@ -738,6 +773,10 @@ int main(int argc, char* argv[]) {
 
     // Game is started from gfx_init_callback after renderer is ready.
     // This blocks until the game exits.
+    if (const char* d = std::getenv("SWE1R_DETERMINISTIC"); d && *d == '1' && !netplay_active()) {
+        det_start(nullptr);
+        printf("[SWE1R] deterministic mode\n");
+    }
     recomp::start(cfg);
 
     // Cleanup

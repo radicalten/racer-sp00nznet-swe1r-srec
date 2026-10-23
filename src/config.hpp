@@ -30,6 +30,9 @@ struct GameConfig {
     bool texturePacks = true;                      // load texture-packs/*.rtz and folders
     bool developerMode = false;                    // RT64 inspector (F1): texture dumping, debug views
 
+    // Netplay
+    int netplayInputDelay = 2;                     // frames of input delay (more hides more latency)
+
     // Input
     double deadzone = 0.15;
     std::array<PlayerConfig, 4> players{};

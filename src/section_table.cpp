@@ -760,6 +760,7 @@ static FuncEntry section_funcs[] = {
     { strchr_8008C344, 0x8BF44, 0x4C },
     { func_8008C390_tail, 0x8BF90, 0x20 },
     { osRecvMesg_unused_8008C3B0, 0x8BFB0, 0x1A0 },
+    { racer_osGetCount, 0x8C150, 0x10 },
     { func_8008C560, 0x8C160, 0x210 },
     { func_8008C7B0, 0x8C3B0, 0x180 },
     { func_8008C930_exception, 0x8C530, 0x150 },
@@ -1390,7 +1391,7 @@ SectionTableEntry section_table[] = {
         0x80000400,  // ram_addr
         0x98000,  // size
         section_funcs,  // funcs
-        1377,  // num_funcs
+        1378,  // num_funcs
         nullptr,  // relocs (none for static code)
         0,  // num_relocs
         0,  // index

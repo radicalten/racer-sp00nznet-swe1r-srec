@@ -92,6 +92,9 @@ GameConfig load_config(const std::filesystem::path& path) {
     read(g, "texturePacks", c.texturePacks);
     read(g, "developerMode", c.developerMode);
 
+    const json np = j.value("netplay", json::object());
+    read(np, "inputDelay", c.netplayInputDelay);
+
     const json in = j.value("input", json::object());
     read(in, "deadzone", c.deadzone);
     if (in.contains("players") && in["players"].is_array()) {
@@ -127,6 +130,7 @@ GameConfig load_config(const std::filesystem::path& path) {
         { "deadzone", c.deadzone }, { "players", players },
         { "controllerBindings", c.controllerBindings }, { "keyboardBindings", c.keyboardBindings },
     };
+    out["netplay"] = { { "inputDelay", c.netplayInputDelay } };
     if (std::ofstream f{ path }) {
         f << out.dump(4) << "\n";
     }

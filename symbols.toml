@@ -3933,7 +3933,8 @@ size = 0x98000
   # (func_800811DC) both call this for timing. Size trimmed to the 2 real
   # instructions; the COP0 timer helpers that follow are separate functions.
   [[section.functions]]
-  name = "osGetCount"
+  # osGetCount, renamed so tools/post_recomp_patches.py can route it to racer_get_count
+  name = "racer_osGetCount"
   vram = 0x8008C550
   size = 0x10
 

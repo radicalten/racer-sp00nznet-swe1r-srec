@@ -60,6 +60,7 @@ No existing N64 decompilation exists for this game. We're flying blind through B
 | **High-res output (RT64 resolution scale, MSAA)** | **COMPLETE** |
 | Widescreen | EXPERIMENTAL |
 | Texture packs (RT64 format) | SUPPORTED |
+| **2-player netplay (deterministic lockstep, UDP)** | **WORKING (tested locally)** |
 | **In-game: tournament race on Boonta Training Course** | **COMPLETE** |
 | **Correct 4:3 presentation in every VI mode** | **COMPLETE** |
 | Audio Reimplementation | TODO |
@@ -240,13 +241,32 @@ Controllers (XInput, DualShock, Switch Pro and anything else SDL knows) are pick
 | input | `players[0..3].device` | `auto` (default), `controller` (with `controller`: index), `keyboard`, `none` |
 | input | `controllerBindings` / `keyboardBindings` | N64 button name to a list of SDL inputs, e.g. `"A": ["a", "+righttrigger"]` or `"A": ["Space"]` |
 
+### Netplay (2 players, LAN or internet)
+
+Two-player lockstep: both PCs run the game and exchange only controller inputs, so each player sees their own full-quality render.
+
+```bash
+# Player 1 (host)
+SWE1Racer.exe --host            # UDP port 7777; --host 7800 for another port
+
+# Player 2
+SWE1Racer.exe --join 100.64.1.2 # the host's address; :port if not 7777
+```
+
+- **Internet:** easiest over [Tailscale](https://tailscale.com) (use the host's `100.x` address), no port forwarding needed. Without it, the host forwards UDP 7777.
+- **Same game for both:** the host's save is sent to player 2 when they connect, so unlocks match. Netplay plays from its own `netplay/` folder (ROM copy and that shared save), so your normal save is never touched.
+- **Latency:** `netplay.inputDelay` in `swe1racer.json` (default 2 frames, about 33 ms) hides that much network round trip; raise it for long distances.
+- Both players need the same build. A mismatch shows up as `[netplay] DESYNC at retrace N` in the console (checked once a second).
+
+How it works: N64ModernRuntime's deterministic mode (`ultramodern::det`) makes the game's clock, timers, retraces and RSP completions happen at fixed points instead of host-timed moments, so identical inputs give identical games. `SWE1R_DETERMINISTIC=1` with `SWE1R_HASHLOG=file` runs that mode offline and logs a game-RAM hash per retrace for comparing two runs.
+
 ### Texture packs
 
 Drop RT64 texture packs (`.rtz` files or folders) into `texture-packs/` next to the exe; they load in alphabetical order. No HD pack for the N64 version of Racer is known to exist yet. Packs made for other emulators (Rice / GLideN64 `hires_texture` format) can be converted with RT64's `texture_hasher` tool from a texture dump; see RT64's [TEXTURE-PACKS.md](https://github.com/rt64/rt64/blob/main/TEXTURE-PACKS.md).
 
 ### Debug switches
 
-Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word.
+Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
 
 ## Project Structure
 

@@ -68,6 +68,8 @@ add_executable(SWE1Racer
     src/audio.cpp
     src/config.cpp
     src/input.cpp
+    src/determinism.cpp
+    src/netplay.cpp
 )
 
 target_include_directories(SWE1Racer PRIVATE
@@ -97,7 +99,7 @@ target_link_libraries(SWE1Racer PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(SWE1Racer PRIVATE dxgi d3d12 d3dcompiler dbghelp)
+    target_link_libraries(SWE1Racer PRIVATE dxgi d3d12 d3dcompiler dbghelp ws2_32)
     target_link_options(SWE1Racer PRIVATE /MAP)
     # RT64 loads the DXC runtime next to the exe; without it setup() silently skips init.
     add_custom_command(TARGET SWE1Racer POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different

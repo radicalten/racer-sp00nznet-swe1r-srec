@@ -36,6 +36,8 @@ stubs = [
     # 0x8008C100/C190/C280 are osEepromLongRead/LongWrite/Probe (named in symbols.toml)
     # osGetTime/osSetCompare COP0 helpers after osGetCount (0x8008C550)
     "func_8008C560",
+    # osGetCount (mfc0 Count): body replaced by a redirect to racer_get_count
+    "racer_osGetCount",
     # func_8008C390 split: tail portion still stubbed
     "func_8008C390_tail",
     # osRecvMesg, osSendMesg, osGetCount: handled by N64Recomp reimplemented_funcs
