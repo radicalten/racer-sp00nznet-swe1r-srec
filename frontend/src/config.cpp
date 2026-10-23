@@ -7,9 +7,13 @@
 
 using json = nlohmann::ordered_json;
 
-GameConfig g_config;
+namespace fe {
 
-static std::map<std::string, std::vector<std::string>> default_controller_bindings() {
+Config g_config;
+GameInfo g_game;
+static std::filesystem::path g_path;
+
+Bindings default_controller_bindings() {
     return {
         { "A",      { "a", "+righttrigger" } },
         { "B",      { "x" } },
@@ -25,22 +29,17 @@ static std::map<std::string, std::vector<std::string>> default_controller_bindin
         { "CDown",  { "+righty", "b" } },
         { "CLeft",  { "-rightx" } },
         { "CRight", { "+rightx" } },
-        // The D-pad also drives the stick: Racer steers and navigates menus with the stick.
-        { "StickUp",    { "dpup" } },
-        { "StickDown",  { "dpdown" } },
-        { "StickLeft",  { "dpleft" } },
-        { "StickRight", { "dpright" } },
     };
 }
 
-static std::map<std::string, std::vector<std::string>> default_keyboard_bindings() {
+Bindings default_keyboard_bindings() {
     return {
         { "A",          { "Return", "Space" } },
         { "B",          { "Left Shift" } },
         { "Z",          { "Z" } },
         { "L",          { "Q" } },
         { "R",          { "E" } },
-        { "Start",      { "Escape", "P" } },
+        { "Start",      { "P", "Backspace" } }, // Escape opens the menu
         { "DUp",        { "I" } },
         { "DDown",      { "K" } },
         { "DLeft",      { "J" } },
@@ -56,10 +55,12 @@ static std::map<std::string, std::vector<std::string>> default_keyboard_bindings
     };
 }
 
-GameConfig load_config(const std::filesystem::path& path) {
-    GameConfig c;
-    c.controllerBindings = default_controller_bindings();
-    c.keyboardBindings = default_keyboard_bindings();
+void load_config(const std::filesystem::path& path) {
+    g_path = path;
+    Config& c = g_config;
+    c = Config{};
+    c.controllerBindings = g_game.controller_bindings.empty() ? default_controller_bindings() : g_game.controller_bindings;
+    c.keyboardBindings = g_game.keyboard_bindings.empty() ? default_keyboard_bindings() : g_game.keyboard_bindings;
 
     json j = json::object();
     if (std::ifstream f{ path }) {
@@ -94,6 +95,8 @@ GameConfig load_config(const std::filesystem::path& path) {
 
     const json np = j.value("netplay", json::object());
     read(np, "inputDelay", c.netplayInputDelay);
+    read(np, "port", c.netplayPort);
+    read(np, "address", c.netplayAddress);
 
     const json in = j.value("input", json::object());
     read(in, "deadzone", c.deadzone);
@@ -114,7 +117,15 @@ GameConfig load_config(const std::filesystem::path& path) {
         }
     }
 
+    // Escape belongs to the menu now (older files bound it to Start).
+    for (auto& [button, keys] : c.keyboardBindings) std::erase(keys, std::string("Escape"));
+
     // Write back the merged config so every option is visible and editable.
+    save_config();
+}
+
+void save_config() {
+    const Config& c = g_config;
     json out;
     out["graphics"] = {
         { "resolution", c.resolution }, { "resolutionMultiplier", c.resolutionMultiplier },
@@ -130,9 +141,10 @@ GameConfig load_config(const std::filesystem::path& path) {
         { "deadzone", c.deadzone }, { "players", players },
         { "controllerBindings", c.controllerBindings }, { "keyboardBindings", c.keyboardBindings },
     };
-    out["netplay"] = { { "inputDelay", c.netplayInputDelay } };
-    if (std::ofstream f{ path }) {
+    out["netplay"] = { { "inputDelay", c.netplayInputDelay }, { "port", c.netplayPort }, { "address", c.netplayAddress } };
+    if (std::ofstream f{ g_path }) {
         f << out.dump(4) << "\n";
     }
-    return c;
 }
+
+} // namespace fe

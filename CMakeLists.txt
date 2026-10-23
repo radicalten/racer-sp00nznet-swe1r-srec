@@ -61,15 +61,12 @@ endif()
 # =============================================================================
 # Main Executable
 # =============================================================================
+add_subdirectory(frontend)
+
 add_executable(SWE1Racer
     src/main.cpp
     src/section_table.cpp
-    src/rt64_render_context.cpp
     src/audio.cpp
-    src/config.cpp
-    src/input.cpp
-    src/determinism.cpp
-    src/netplay.cpp
 )
 
 target_include_directories(SWE1Racer PRIVATE
@@ -93,6 +90,7 @@ target_link_libraries(SWE1Racer PRIVATE
     RecompiledFuncs
     librecomp
     ultramodern
+    n64frontend
     rt64
     SDL2::SDL2
     SDL2::SDL2main

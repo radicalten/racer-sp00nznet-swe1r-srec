@@ -211,20 +211,25 @@ python tools/gen_lookup_table.py
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config RelWithDebInfo
 
-# 4. Put your ROM next to the exe as swe1racer.z64 and run it
-cp baserom.z64 build/RelWithDebInfo/swe1racer.z64
+# 4. Run it; the launcher asks for your ROM the first time (drop the .z64 onto the window)
 cd build/RelWithDebInfo && ./SWE1Racer.exe
 ```
 
 ## Playing
 
-Default keyboard: arrows / WASD = stick, Space or Enter = A (throttle), Left Shift = B, Z = Z, Q / E = L / R, numpad 8/2/4/6 = C buttons, Escape or P = Start. F11 or Alt+Enter toggles fullscreen.
+The exe opens a launcher: **Play**, **Host a game** / **Join** for netplay, and **Settings** (controls, graphics, netplay). In game, **Esc** or the controller's **Back** button opens the menu (Resume, Settings, Quit). `--play` skips the launcher. The game keeps running behind the menu.
 
-Controllers (XInput, DualShock, Switch Pro and anything else SDL knows) are picked up automatically and can be plugged in at any time: A or right trigger = A, X = B, left trigger = Z, bumpers = L / R, right stick or Y/B = C buttons, Start = Start. Controller 1 drives player 1, controller 2 player 2, and so on; the keyboard also drives player 1. The N64 game itself supports at most 2 players (split screen).
+| Launcher | In-game menu | Graphics settings |
+|---|---|---|
+| ![Launcher](docs/screenshots/launcher.png) | ![Menu](docs/screenshots/menu.png) | ![Graphics settings](docs/screenshots/settings-graphics.png) |
+
+Default keyboard: arrows / WASD = stick, Space or Enter = A (throttle), Left Shift = B, Z = Z, Q / E = L / R, numpad 8/2/4/6 = C buttons, P or Backspace = Start. F11 or Alt+Enter toggles fullscreen.
+
+Controllers (XInput, DualShock, Switch Pro and anything else SDL knows) are picked up automatically: A or right trigger = A, X = B, left trigger = Z, bumpers = L / R, right stick or Y/B = C buttons, Start = Start. Local 2-player is drop-in, drop-out: each player keeps the controller they got, a controller plugged in goes to the first player without one, and unplugging one frees only that player's slot. The keyboard also drives player 1. Settings > Controls pins a player to a specific controller, the keyboard, or nobody, and rebinds buttons by pressing them. The N64 game itself supports at most 2 players (split screen).
 
 ### Configuration
 
-`swe1racer.json` is created next to the exe on first run and lists every option:
+Settings change `swe1racer.json` (in the working directory, created on first run), which you can also edit by hand:
 
 | Section | Option | Values |
 |---|---|---|
@@ -240,17 +245,17 @@ Controllers (XInput, DualShock, Switch Pro and anything else SDL knows) are pick
 | input | `deadzone` | stick deadzone, `0.15` by default |
 | input | `players[0..3].device` | `auto` (default), `controller` (with `controller`: index), `keyboard`, `none` |
 | input | `controllerBindings` / `keyboardBindings` | N64 button name to a list of SDL inputs, e.g. `"A": ["a", "+righttrigger"]` or `"A": ["Space"]` |
+| netplay | `inputDelay`, `port`, `address` | frames of input delay (host's wins), the UDP port to host on, the last address joined |
 
 ### Netplay (2 players, LAN or internet)
 
 Two-player lockstep: both PCs run the game and exchange only controller inputs, so each player sees their own full-quality render.
 
-```bash
-# Player 1 (host)
-SWE1Racer.exe --host            # UDP port 7777; --host 7800 for another port
+In the launcher, player 1 picks **Host a game** (it lists this PC's addresses to give player 2) and player 2 types that address and picks **Join**. The same from the command line:
 
-# Player 2
-SWE1Racer.exe --join 100.64.1.2 # the host's address; :port if not 7777
+```bash
+SWE1Racer.exe --host            # player 1; UDP port 7777, --host 7800 for another
+SWE1Racer.exe --join 100.64.1.2 # player 2; :port if not 7777
 ```
 
 - **Internet:** easiest over [Tailscale](https://tailscale.com) (use the host's `100.x` address), no port forwarding needed. Without it, the host forwards UDP 7777.
@@ -266,7 +271,7 @@ Drop RT64 texture packs (`.rtz` files or folders) into `texture-packs/` next to 
 
 ### Debug switches
 
-Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
+Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_UI=launcher|menu|settings[:Controls|Graphics|Netplay]` opens that screen at start, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
 
 ## Project Structure
 
@@ -289,8 +294,11 @@ racer/
 ├── src/
 │   ├── main.cpp           # Entry point, SDL window, callbacks
 │   ├── section_table.cpp  # VRAM->function pointer lookup table
-│   ├── rt64_render_context.cpp  # RT64 renderer bridge (placeholder)
 │   └── audio.cpp          # Audio stubs (SDL playback TODO)
+├── frontend/              # Shared with our other N64 recomps (game-agnostic)
+│   ├── include/frontend/frontend.hpp  # fe::GameInfo + fe::run: the whole API a game uses
+│   └── src/               # window/startup, config file, input, launcher + menu (ImGui over RT64),
+│                          # RT64 context, netplay, deterministic-mode checks
 ├── RecompiledFuncs/       # N64Recomp output (generated)
 │   ├── funcs.h            # Function declarations
 │   └── funcs_*.c          # Recompiled C code (29 files)

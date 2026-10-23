@@ -1,5 +1,5 @@
-// RT64 Render Context for Star Wars Episode I: Racer
-// Bridges ultramodern's RendererContext with the RT64 renderer
+// RT64 render context: bridges ultramodern's RendererContext with the RT64 renderer, applying the
+// config file's graphics settings (live when the menu changes them).
 
 // NOMINMAX must be set globally via CMake (target_compile_definitions)
 // Include RT64 first to avoid Windows.h macro conflicts
@@ -13,9 +13,14 @@
 #include "ultramodern/renderer_context.hpp"
 #include "librecomp/game.hpp"
 #include "config.hpp"
+#include "internal.hpp"
 
 #include <algorithm>
 #include <filesystem>
+
+namespace fe {
+
+std::atomic<bool> g_graphics_dirty = false;
 
 // Maps a config string onto an RT64 enum value; unknown names keep `fallback`.
 template <typename E>
@@ -25,7 +30,7 @@ static E pick(const std::string& name, std::initializer_list<std::pair<const cha
     return fallback;
 }
 
-// Applies swe1racer.json's graphics section to RT64 (before setup, so device choices see it).
+// Applies the config's graphics section to RT64.
 static void apply_graphics_config(RT64::UserConfiguration& u) {
     using U = RT64::UserConfiguration;
     u.resolution = pick(g_config.resolution, { { "Original", U::Resolution::Original },
@@ -39,7 +44,7 @@ static void apply_graphics_config(RT64::UserConfiguration& u) {
         { "AntiAliasedPixelScaling", U::Filtering::AntiAliasedPixelScaling } }, u.filtering);
     u.refreshRate = pick(g_config.refreshRate, { { "Original", U::RefreshRate::Original },
         { "Display", U::RefreshRate::Display } }, u.refreshRate);
-    u.developerMode = g_config.developerMode;
+    u.developerMode = g_config.developerMode; // read at setup only
     u.validate();
 }
 
@@ -53,9 +58,9 @@ static void load_texture_packs(RT64::Application& app) {
     }
     std::sort(packs.begin(), packs.end(), [](auto& a, auto& b) { return a.dirOrZipPath < b.dirOrZipPath; });
     if (packs.empty()) return;
-    for (auto& p : packs) printf("[SWE1R] texture pack: %s\n", p.dirOrZipPath.filename().string().c_str());
+    for (auto& p : packs) printf("[frontend] texture pack: %s\n", p.dirOrZipPath.filename().string().c_str());
     if (!app.textureCache->loadReplacementDirectories(packs)) {
-        fprintf(stderr, "[SWE1R] failed to load texture packs\n");
+        fprintf(stderr, "[frontend] failed to load texture packs\n");
     }
 }
 
@@ -78,9 +83,9 @@ static void dummy_check_interrupts() {
     // No-op: ultramodern handles interrupts
 }
 
-class SWE1RRenderContext : public ultramodern::renderer::RendererContext {
+class RT64Context : public ultramodern::renderer::RendererContext {
 public:
-    SWE1RRenderContext(uint8_t* rdram, ultramodern::renderer::WindowHandle window_handle, bool developer_mode)
+    RT64Context(uint8_t* rdram, ultramodern::renderer::WindowHandle window_handle, bool developer_mode)
         : rdram_(rdram), window_handle_(window_handle), developer_mode_(developer_mode)
     {
         setup_result = ultramodern::renderer::SetupResult::Success;
@@ -137,12 +142,12 @@ public:
 
         // Configure RT64 application
         RT64::ApplicationConfiguration app_config;
-        app_config.appId = "swe1racer";
+        app_config.appId = g_game.short_name;
         app_config.detectDataPath = true;
-        app_config.useConfigurationFile = false; // settings come from swe1racer.json
+        app_config.useConfigurationFile = false; // settings come from our config file
 
         // Create the RT64 Application
-        printf("[SWE1R] Creating RT64 application...\n");
+        printf("[rt64] Creating RT64 application...\n");
         app_ = std::make_unique<RT64::Application>(core, app_config);
         apply_graphics_config(app_->userConfig);
 
@@ -151,34 +156,34 @@ public:
 
         switch (result) {
         case RT64::Application::SetupResult::Success:
-            printf("[SWE1R] RT64 initialized successfully\n");
+            printf("[rt64] RT64 initialized successfully\n");
             if (g_config.texturePacks) {
                 load_texture_packs(*app_);
             }
             is_valid_ = true;
             break;
         case RT64::Application::SetupResult::DynamicLibrariesNotFound:
-            fprintf(stderr, "[SWE1R] RT64: Dynamic libraries not found\n");
+            fprintf(stderr, "[rt64] RT64: Dynamic libraries not found\n");
             setup_result = ultramodern::renderer::SetupResult::DynamicLibrariesNotFound;
             break;
         case RT64::Application::SetupResult::InvalidGraphicsAPI:
-            fprintf(stderr, "[SWE1R] RT64: Invalid graphics API\n");
+            fprintf(stderr, "[rt64] RT64: Invalid graphics API\n");
             setup_result = ultramodern::renderer::SetupResult::InvalidGraphicsAPI;
             break;
         case RT64::Application::SetupResult::GraphicsAPINotFound:
-            fprintf(stderr, "[SWE1R] RT64: Graphics API not found\n");
+            fprintf(stderr, "[rt64] RT64: Graphics API not found\n");
             setup_result = ultramodern::renderer::SetupResult::GraphicsAPINotFound;
             break;
         case RT64::Application::SetupResult::GraphicsDeviceNotFound:
-            fprintf(stderr, "[SWE1R] RT64: Graphics device not found\n");
+            fprintf(stderr, "[rt64] RT64: Graphics device not found\n");
             setup_result = ultramodern::renderer::SetupResult::GraphicsDeviceNotFound;
             break;
         }
     }
 
-    ~SWE1RRenderContext() override {
+    ~RT64Context() override {
         if (app_) {
-            printf("[SWE1R] Destroying RT64 application\n");
+            printf("[rt64] Destroying RT64 application\n");
             app_.reset();
         }
     }
@@ -200,7 +205,7 @@ public:
 
         dl_count_++;
         if (dl_count_ <= 5 || (dl_count_ % 60 == 0)) {
-            printf("[SWE1R] send_dl #%u: data_ptr=0x%08X ucode=0x%08X ucode_data=0x%08X type=%u\n",
+            printf("[rt64] send_dl #%u: data_ptr=0x%08X ucode=0x%08X ucode_data=0x%08X type=%u\n",
                    dl_count_, (uint32_t)task->t.data_ptr, (uint32_t)task->t.ucode,
                    (uint32_t)task->t.ucode_data, task->t.type);
         }
@@ -224,17 +229,25 @@ public:
 
         screen_count_++;
         if (screen_count_ <= 5 || (screen_count_ % 60 == 0)) {
-            printf("[SWE1R] update_screen #%u VI origin=0x%08X width=%u hstart=0x%08X vstart=0x%08X status=0x%08X xscale=0x%X yscale=0x%X vsync=0x%X hsync=0x%X\n",
+            printf("[rt64] update_screen #%u VI origin=0x%08X width=%u hstart=0x%08X vstart=0x%08X status=0x%08X xscale=0x%X yscale=0x%X vsync=0x%X hsync=0x%X\n",
                    screen_count_, vi_regs_->VI_ORIGIN_REG, vi_regs_->VI_WIDTH_REG,
                    vi_regs_->VI_H_START_REG, vi_regs_->VI_V_START_REG, vi_regs_->VI_STATUS_REG,
                    vi_regs_->VI_X_SCALE_REG, vi_regs_->VI_Y_SCALE_REG, vi_regs_->VI_V_SYNC_REG, vi_regs_->VI_H_SYNC_REG);
+        }
+
+        // The menu changed graphics settings: apply them here, on the thread RT64 presents from.
+        if (g_graphics_dirty.exchange(false)) {
+            RT64::UserConfiguration::Antialiasing old_aa = app_->userConfig.antialiasing;
+            apply_graphics_config(app_->userConfig);
+            app_->updateUserConfig(true);
+            if (app_->userConfig.antialiasing != old_aa) app_->updateMultisampling();
         }
 
         app_->updateScreen();
     }
 
     void shutdown() override {
-        printf("[SWE1R] Render context shutdown\n");
+        printf("[rt64] Render context shutdown\n");
         if (app_) {
             app_.reset();
         }
@@ -261,8 +274,9 @@ private:
     uint32_t screen_count_ = 0;
 };
 
-// Factory function
-std::unique_ptr<ultramodern::renderer::RendererContext> create_swe1r_render_context(
+std::unique_ptr<ultramodern::renderer::RendererContext> create_render_context(
     uint8_t* rdram, ultramodern::renderer::WindowHandle window_handle, bool developer_mode) {
-    return std::make_unique<SWE1RRenderContext>(rdram, window_handle, developer_mode);
+    return std::make_unique<RT64Context>(rdram, window_handle, developer_mode);
 }
+
+} // namespace fe

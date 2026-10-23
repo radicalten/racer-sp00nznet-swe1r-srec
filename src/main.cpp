@@ -35,14 +35,7 @@
 #include "ultramodern/events.hpp"
 #include "ultramodern/input.hpp"
 #include "ultramodern/threads.hpp"
-#include "config.hpp"
-
-// From input.cpp
-void input_init();
-void input_handle_event(const SDL_Event& e);
-bool input_get(int port, uint16_t* buttons, float* x, float* y);
-ultramodern::input::connected_device_info_t input_device_info(int port);
-void input_set_rumble(int port, bool on);
+#include "frontend/frontend.hpp"
 
 // =============================================================================
 // External declarations
@@ -51,10 +44,6 @@ void input_set_rumble(int port, bool on);
 // From section_table.cpp
 extern SectionTableEntry section_table[];
 extern const size_t num_sections;
-
-// From rt64_render_context.cpp
-extern std::unique_ptr<ultramodern::renderer::RendererContext> create_swe1r_render_context(
-    uint8_t* rdram, ultramodern::renderer::WindowHandle window_handle, bool developer_mode);
 
 // The recompiled entrypoint function
 extern "C" void recomp_entrypoint(uint8_t* rdram, recomp_context* ctx);
@@ -67,15 +56,6 @@ extern void swe1r_set_frequency(uint32_t freq);
 // RDRAM base — captured in on_game_init so the crash handler can translate
 // native fault addresses back into N64 virtual addresses.
 static uint8_t* g_rdram_base = nullptr;
-uint8_t* g_rdram_base_for_det = nullptr; // read by determinism.cpp
-
-// From determinism.cpp
-bool det_enabled();
-uint64_t det_frame();
-void det_start(void (*then)(uint64_t));
-
-// --headless: hidden window, nothing on screen (rendering still runs).
-static bool g_headless = false;
 
 // SI DMA: the game's __osSiRawStartDma is COP0/MMIO based and can't be
 // recompiled. It moves a 64-byte block between DRAM and PIF RAM and raises an
@@ -139,11 +119,6 @@ extern "C" void __osSiRawStartDma_recomp(uint8_t* rdram, recomp_context* ctx) {
 constexpr uint64_t SWE1R_ROM_HASH = 0x9B89D0F9EBC12D32ULL; // XXH3_64bits of baserom.z64
 
 // =============================================================================
-// Global state
-// =============================================================================
-static SDL_Window* g_window = nullptr;
-
-// =============================================================================
 // RSP Callbacks
 // =============================================================================
 
@@ -170,150 +145,6 @@ RspUcodeFunc* get_rsp_microcode(const OSTask* task) {
 }
 
 // =============================================================================
-// Renderer Callbacks
-// =============================================================================
-
-std::unique_ptr<ultramodern::renderer::RendererContext> create_render_context_callback(
-    uint8_t* rdram, ultramodern::renderer::WindowHandle window_handle, bool developer_mode) {
-    return create_swe1r_render_context(rdram, window_handle, developer_mode);
-}
-
-// =============================================================================
-// GFX Callbacks (window management)
-// =============================================================================
-
-ultramodern::gfx_callbacks_t::gfx_data_t create_gfx() {
-    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
-    SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, "0");
-    // Keep reading controllers when the window isn't focused (remote desktop, a second monitor).
-    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0) {
-        fprintf(stderr, "Failed to initialize SDL2: %s\n", SDL_GetError());
-        std::exit(1);
-    }
-
-    printf("[SWE1R] SDL initialized: %s\n", SDL_GetCurrentVideoDriver());
-    return nullptr;
-}
-
-ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::gfx_data_t) {
-    // SWE1R_DISPLAY=<n> overrides the configured monitor.
-    const char* disp_env = std::getenv("SWE1R_DISPLAY");
-    int disp = disp_env ? std::atoi(disp_env) : g_config.display;
-    Uint32 flags = SDL_WINDOW_RESIZABLE | (g_config.fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
-    if (g_headless) flags = SDL_WINDOW_HIDDEN;
-    g_window = SDL_CreateWindow(
-        "Star Wars Episode I: Racer",
-        SDL_WINDOWPOS_CENTERED_DISPLAY(disp), SDL_WINDOWPOS_CENTERED_DISPLAY(disp),
-        g_config.windowWidth, g_config.windowHeight, flags
-    );
-
-    if (!g_window) {
-        fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
-        std::exit(1);
-    }
-
-    printf("[SWE1R] Window created (%dx%d%s)\n", g_config.windowWidth, g_config.windowHeight,
-           g_config.fullscreen ? ", fullscreen" : "");
-
-    // Return native window handle
-    SDL_SysWMinfo wminfo;
-    SDL_VERSION(&wminfo.version);
-    SDL_GetWindowWMInfo(g_window, &wminfo);
-
-    ultramodern::renderer::WindowHandle handle{};
-    handle.window = wminfo.info.win.window;
-    handle.thread_id = GetCurrentThreadId();
-    return handle;
-}
-
-void update_gfx(ultramodern::gfx_callbacks_t::gfx_data_t) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        input_handle_event(event);
-        switch (event.type) {
-            case SDL_QUIT:
-                ultramodern::quit();
-                break;
-            case SDL_KEYDOWN: {
-                // F11 or Alt+Enter toggles borderless fullscreen.
-                const SDL_Keysym& k = event.key.keysym;
-                if (k.sym == SDLK_F11 || (k.sym == SDLK_RETURN && (k.mod & KMOD_ALT))) {
-                    bool full = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
-                    SDL_SetWindowFullscreen(g_window, full ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-                }
-                break;
-            }
-        }
-    }
-}
-
-// =============================================================================
-// Input Callbacks (input.cpp)
-// =============================================================================
-
-void poll_input() {
-    // SDL event polling is done in update_gfx
-}
-
-// From netplay.cpp
-bool netplay_active();
-std::filesystem::path netplay_setup(int argc, char** argv, const std::filesystem::path& base, int delay);
-bool netplay_get_input(int port, uint16_t* buttons, float* x, float* y);
-ultramodern::input::connected_device_info_t netplay_device_info(int port);
-
-bool sample_local_input(uint16_t* buttons, float* x, float* y);
-
-bool get_input(int controller_num, uint16_t* buttons, float* x, float* y) {
-    // Netplay: the synchronized inputs of both players, sampled once per retrace.
-    if (netplay_active()) return netplay_get_input(controller_num, buttons, x, y);
-    if (controller_num == 0) return sample_local_input(buttons, x, y);
-    return input_get(controller_num, buttons, x, y);
-}
-
-// Player 1's local input (keyboard/controller plus SWE1R_AUTOPRESS). Netplay samples it per retrace.
-bool sample_local_input(uint16_t* buttons, float* x, float* y) {
-    const int controller_num = 0;
-    bool connected = input_get(controller_num, buttons, x, y);
-
-    // SWE1R_AUTOPRESS="28:1000,31.5:8000": hold those N64 buttons on port 1 for 0.25s at each
-    // time (seconds since the first poll). For scripted test runs without a human at the keyboard.
-    if (controller_num == 0) {
-        static std::vector<std::pair<double, uint16_t>> script = [] {
-            std::vector<std::pair<double, uint16_t>> s;
-            if (const char* e = std::getenv("SWE1R_AUTOPRESS")) {
-                for (const char* p = e; *p; ) {
-                    char* end;
-                    double t = strtod(p, &end);
-                    if (*end != ':') break;
-                    uint16_t b = (uint16_t)strtoul(end + 1, &end, 16);
-                    s.push_back({ t, b });
-                    p = (*end == ',') ? end + 1 : end;
-                }
-            }
-            return s;
-        }();
-        static const uint64_t start_ticks = SDL_GetTicks64();
-        // In deterministic mode the script counts frames (60 per second), so runs replay exactly.
-        double now = det_enabled() ? det_frame() / 60.0 : (SDL_GetTicks64() - start_ticks) / 1000.0;
-        for (auto& [t, b] : script) {
-            if (now >= t && now < t + 0.25) *buttons |= b;
-        }
-    }
-    return connected;
-}
-
-void set_rumble(int controller_num, bool rumble) {
-    input_set_rumble(controller_num, rumble);
-}
-
-ultramodern::input::connected_device_info_t get_connected_device_info(int controller_num) {
-    if (netplay_active()) return netplay_device_info(controller_num);
-    return input_device_info(controller_num);
-}
-
-// =============================================================================
 // Event Callbacks
 // =============================================================================
 
@@ -321,25 +152,10 @@ void vi_callback() {
     // Called every VI interrupt
 }
 
-void gfx_init_callback() {
-    printf("[SWE1R] Graphics initialized\n");
-    // Start the game now that the renderer and VI thread are ready.
-    // This must happen after start() has begun, not before, so the VI
-    // thread gets a chance to set dummy VI state before is_game_started() is true.
-    std::u8string game_id = u8"swe1racer";
-    recomp::start_game(game_id, ""); // no game modes (a mod-system feature)
-    printf("[SWE1R] Game started\n");
-}
-
-// =============================================================================
-// Error Handling
-// =============================================================================
-
-void error_message_box(const char* msg) {
-    fprintf(stderr, "[SWE1R ERROR] %s\n", msg);
-    if (g_window) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "SWE1R Error", msg, g_window);
-    }
+// The game's osGetCount (racer_osGetCount, redirected by tools/post_recomp_patches.py). The runtime
+// returns virtual time in deterministic mode.
+extern "C" void racer_get_count(uint8_t* rdram, recomp_context* ctx) {
+    ctx->r2 = (int32_t)osGetCount(); // mfc0 sign-extends
 }
 
 // =============================================================================
@@ -358,7 +174,7 @@ void on_game_init(uint8_t* rdram, recomp_context* ctx) {
     // Capture the RDRAM base so the crash handler can map native fault
     // addresses back to N64 virtual addresses.
     g_rdram_base = rdram;
-    g_rdram_base_for_det = rdram;
+    fe::set_rdram(rdram);
 
     // The game's boot code at 0x8008D284 initializes the PI (cartridge ROM) handle
     // and stores it at globals 0x800A7BC0 and 0x800A7FC0. That code is stubbed
@@ -652,10 +468,6 @@ static void print_stack(HANDLE thread, CONTEXT ctx, int max_frames) {
 }
 
 int main(int argc, char* argv[]) {
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--headless") g_headless = true;
-    }
-    if (const char* h = std::getenv("SWE1R_HEADLESS"); h && *h == '1') g_headless = true;
     // Force unbuffered output so we see prints before crashes
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
@@ -710,81 +522,34 @@ int main(int argc, char* argv[]) {
     printf("[SWE1R] Game registered: %zu sections, %zu functions in main section\n",
            num_sections, section_table[0].num_funcs);
 
-    // Set up config path
-    g_config = load_config(std::filesystem::current_path() / "swe1racer.json");
-    input_init();
-    // --host / --join: handshake now; netplay keeps its ROM copy and shared save in netplay/.
-    recomp::register_config_path(netplay_setup(argc, argv, std::filesystem::current_path(), g_config.netplayInputDelay));
-
-    // Build the configuration
     recomp::Configuration cfg{};
-    cfg.project_version = { 0, 1, 0, "-alpha" };
+    cfg.project_version = { 0, 2, 0, "-alpha" };
+    cfg.rsp_callbacks.get_rsp_microcode = get_rsp_microcode;
+    cfg.audio_callbacks = { swe1r_queue_samples, swe1r_get_frames_remaining, swe1r_set_frequency };
+    cfg.events_callbacks.vi_callback = vi_callback;
+    cfg.threads_callbacks.get_game_thread_name = get_game_thread_name;
 
-    // RSP callbacks
-    recomp::rsp::callbacks_t rsp_callbacks{};
-    rsp_callbacks.get_rsp_microcode = get_rsp_microcode;
-    cfg.rsp_callbacks = rsp_callbacks;
-
-    // Renderer callbacks
-    ultramodern::renderer::callbacks_t renderer_callbacks{};
-    renderer_callbacks.create_render_context = create_render_context_callback;
-    cfg.renderer_callbacks = renderer_callbacks;
-
-    // Audio callbacks
-    ultramodern::audio_callbacks_t audio_callbacks{};
-    audio_callbacks.queue_samples = swe1r_queue_samples;
-    audio_callbacks.get_frames_remaining = swe1r_get_frames_remaining;
-    audio_callbacks.set_frequency = swe1r_set_frequency;
-    cfg.audio_callbacks = audio_callbacks;
-
-    // Input callbacks
-    ultramodern::input::callbacks_t input_callbacks{};
-    input_callbacks.poll_input = poll_input;
-    input_callbacks.get_input = get_input;
-    input_callbacks.set_rumble = set_rumble;
-    input_callbacks.get_connected_device_info = get_connected_device_info;
-    cfg.input_callbacks = input_callbacks;
-
-    // GFX callbacks (window management)
-    ultramodern::gfx_callbacks_t gfx_callbacks{};
-    gfx_callbacks.create_gfx = create_gfx;
-    gfx_callbacks.create_window = create_window;
-    gfx_callbacks.update_gfx = update_gfx;
-    cfg.gfx_callbacks = gfx_callbacks;
-
-    // Events callbacks
-    ultramodern::events::callbacks_t events_callbacks{};
-    events_callbacks.vi_callback = vi_callback;
-    events_callbacks.gfx_init_callback = gfx_init_callback;
-    cfg.events_callbacks = events_callbacks;
-
-    // Error handling
-    ultramodern::error_handling::callbacks_t error_callbacks{};
-    error_callbacks.message_box = error_message_box;
-    cfg.error_handling_callbacks = error_callbacks;
-
-    // Threads
-    ultramodern::threads::callbacks_t threads_callbacks{};
-    threads_callbacks.get_game_thread_name = get_game_thread_name;
-    cfg.threads_callbacks = threads_callbacks;
+    fe::GameInfo game;
+    game.title = "Star Wars Episode I: Racer";
+    game.game_id = u8"swe1racer";
+    game.short_name = "swe1racer";
+    game.rom_names = { "swe1racer.us.z64", "Star Wars Episode I - Racer (U) [!].z64", "baserom.z64" };
+    game.players = 2;
+    game.env_prefix = "SWE1R_";
+    game.controller_bindings = fe::default_controller_bindings();
+    // The D-pad also drives the stick: Racer steers and navigates menus with the stick.
+    game.controller_bindings["StickUp"] = { "dpup" };
+    game.controller_bindings["StickDown"] = { "dpdown" };
+    game.controller_bindings["StickLeft"] = { "dpleft" };
+    game.controller_bindings["StickRight"] = { "dpright" };
+    game.netplay = true;
+    // ponytail: the game's four OSThreads sit at fixed addresses; track osCreateThread if that changes.
+    game.det_mask_words = { 0x000D7770, 0x000D7A20, 0x00149EF0, 0x0014B200 };
+    game.det_ram_end = 0x00600000; // framebuffers (and RT64 write-backs) live above this
 
     printf("[SWE1R] Starting runtime...\n");
     printf("  \"It's working! IT'S WORKING!\" - Anakin Skywalker\n\n");
-
-    // Game is started from gfx_init_callback after renderer is ready.
-    // This blocks until the game exits.
-    if (const char* d = std::getenv("SWE1R_DETERMINISTIC"); d && *d == '1' && !netplay_active()) {
-        det_start(nullptr);
-        printf("[SWE1R] deterministic mode\n");
-    }
-    recomp::start(cfg);
-
-    // Cleanup
-    if (g_window) {
-        SDL_DestroyWindow(g_window);
-    }
-    SDL_Quit();
-
+    int rc = fe::run(game, cfg, argc, argv);
     printf("\n[SWE1R] Shutdown complete.\n");
-    return 0;
+    return rc;
 }
