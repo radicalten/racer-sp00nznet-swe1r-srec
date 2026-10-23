@@ -866,8 +866,9 @@ static FuncEntry section_funcs[] = {
     { func_80097D20, 0x97920, 0x50 },
     { func_80097D70, 0x97970, 0x50 },
     { func_80097DC0, 0x979C0, 0xA0 },
-    { func_80097E60, 0x97A60, 0x108 },
-    { func_80097F68, 0x97B68, 0x498 },
+    { func_80097E60, 0x97A60, 0x100 },
+    { ldiv_80097F60, 0x97B60, 0x88 },
+    { rsp_blob_80097FE8, 0x97BE8, 0x418 },
     { static_0_8000097C, 0x57C, 0x0 },  // auto-detected
     { static_0_80002BD4, 0x27D4, 0x0 },  // auto-detected
     { static_0_80002E2C, 0x2A2C, 0x0 },  // auto-detected
@@ -1381,7 +1382,6 @@ static FuncEntry section_funcs[] = {
     { static_0_800941B0, 0x93DB0, 0x0 },  // auto-detected
     { static_0_800941D0, 0x93DD0, 0x0 },  // auto-detected
     { static_0_80095AA0, 0x956A0, 0x0 },  // auto-detected
-    { static_0_80097F60, 0x97B60, 0x0 },  // auto-detected
 };
 
 SectionTableEntry section_table[] = {

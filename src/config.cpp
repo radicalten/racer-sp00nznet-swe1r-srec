@@ -25,6 +25,11 @@ static std::map<std::string, std::vector<std::string>> default_controller_bindin
         { "CDown",  { "+righty", "b" } },
         { "CLeft",  { "-rightx" } },
         { "CRight", { "+rightx" } },
+        // The D-pad also drives the stick: Racer steers and navigates menus with the stick.
+        { "StickUp",    { "dpup" } },
+        { "StickDown",  { "dpdown" } },
+        { "StickLeft",  { "dpleft" } },
+        { "StickRight", { "dpright" } },
     };
 }
 

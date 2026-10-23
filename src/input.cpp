@@ -40,8 +40,33 @@ struct Binding { uint16_t mask; std::vector<PadInput> pad; std::vector<SDL_Scanc
 
 std::vector<Binding> g_bindings;
 std::vector<SDL_Scancode> g_stick_keys[4]; // up, down, left, right
+std::vector<PadInput> g_stick_pad[4];      // same, from controller bindings
 std::mutex g_pads_mutex;
 std::vector<SDL_GameController*> g_pads; // in connection order
+
+// "a" / "leftshoulder" -> button; "+lefttrigger" / "-righty" -> axis direction.
+bool parse_pad_input(const std::string& s, PadInput& in) {
+    if (!s.empty() && (s[0] == '+' || s[0] == '-')) {
+        in.sign = (s[0] == '+') ? 1 : -1;
+        in.axis = SDL_GameControllerGetAxisFromString(s.c_str() + 1);
+    } else {
+        in.button = SDL_GameControllerGetButtonFromString(s.c_str());
+    }
+    if (in.axis == SDL_CONTROLLER_AXIS_INVALID && in.button == SDL_CONTROLLER_BUTTON_INVALID) {
+        fprintf(stderr, "[input] unknown controller input '%s'\n", s.c_str());
+        return false;
+    }
+    return true;
+}
+
+float axis(SDL_GameController* pad, SDL_GameControllerAxis a) {
+    return std::clamp(SDL_GameControllerGetAxis(pad, a) / 32767.0f, -1.0f, 1.0f);
+}
+
+bool pad_held(SDL_GameController* pad, const PadInput& in) {
+    if (in.button != SDL_CONTROLLER_BUTTON_INVALID) return SDL_GameControllerGetButton(pad, in.button) != 0;
+    return axis(pad, in.axis) * in.sign > 0.5f;
+}
 
 void build_bindings() {
     for (auto& [name, mask] : kButtons) {
@@ -49,17 +74,7 @@ void build_bindings() {
         if (auto it = g_config.controllerBindings.find(name); it != g_config.controllerBindings.end()) {
             for (const std::string& s : it->second) {
                 PadInput in;
-                if (!s.empty() && (s[0] == '+' || s[0] == '-')) {
-                    in.sign = (s[0] == '+') ? 1 : -1;
-                    in.axis = SDL_GameControllerGetAxisFromString(s.c_str() + 1);
-                } else {
-                    in.button = SDL_GameControllerGetButtonFromString(s.c_str());
-                }
-                if (in.axis == SDL_CONTROLLER_AXIS_INVALID && in.button == SDL_CONTROLLER_BUTTON_INVALID) {
-                    fprintf(stderr, "[input] unknown controller input '%s' for %s\n", s.c_str(), name);
-                } else {
-                    b.pad.push_back(in);
-                }
+                if (parse_pad_input(s, in)) b.pad.push_back(in);
             }
         }
         if (auto it = g_config.keyboardBindings.find(name); it != g_config.keyboardBindings.end()) {
@@ -73,6 +88,12 @@ void build_bindings() {
     }
     const char* stick_names[4] = { "StickUp", "StickDown", "StickLeft", "StickRight" };
     for (int i = 0; i < 4; i++) {
+        if (auto it = g_config.controllerBindings.find(stick_names[i]); it != g_config.controllerBindings.end()) {
+            for (const std::string& s : it->second) {
+                PadInput in;
+                if (parse_pad_input(s, in)) g_stick_pad[i].push_back(in);
+            }
+        }
         if (auto it = g_config.keyboardBindings.find(stick_names[i]); it != g_config.keyboardBindings.end()) {
             for (const std::string& s : it->second) {
                 SDL_Scancode sc = SDL_GetScancodeFromName(s.c_str());
@@ -96,10 +117,6 @@ Source source_for(int port) {
     s.keyboard = (p.device == "auto" && port == 0);
     s.connected = s.pad != nullptr || s.keyboard;
     return s;
-}
-
-float axis(SDL_GameController* pad, SDL_GameControllerAxis a) {
-    return std::clamp(SDL_GameControllerGetAxis(pad, a) / 32767.0f, -1.0f, 1.0f);
 }
 
 } // namespace
@@ -139,10 +156,7 @@ bool input_get(int port, uint16_t* buttons, float* x, float* y) {
     for (const Binding& b : g_bindings) {
         bool down = false;
         if (keys) for (SDL_Scancode k : b.keys) down |= keys[k] != 0;
-        if (s.pad) for (const PadInput& in : b.pad) {
-            if (in.button != SDL_CONTROLLER_BUTTON_INVALID) down |= SDL_GameControllerGetButton(s.pad, in.button) != 0;
-            else down |= axis(s.pad, in.axis) * in.sign > 0.5f;
-        }
+        if (s.pad) for (const PadInput& in : b.pad) down |= pad_held(s.pad, in);
         if (down) *buttons |= b.mask;
     }
     static bool logged[4] = {};
@@ -157,6 +171,9 @@ bool input_get(int port, uint16_t* buttons, float* x, float* y) {
         *x += (held(3) ? 1.0f : 0.0f) - (held(2) ? 1.0f : 0.0f);
     }
     if (s.pad) {
+        auto held = [&](int dir) { for (const PadInput& in : g_stick_pad[dir]) if (pad_held(s.pad, in)) return true; return false; };
+        *y += (held(0) ? 1.0f : 0.0f) - (held(1) ? 1.0f : 0.0f);
+        *x += (held(3) ? 1.0f : 0.0f) - (held(2) ? 1.0f : 0.0f);
         // Radial deadzone, rescaled so the stick still reaches full deflection.
         float sx = axis(s.pad, SDL_CONTROLLER_AXIS_LEFTX), sy = -axis(s.pad, SDL_CONTROLLER_AXIS_LEFTY);
         float mag = std::sqrt(sx * sx + sy * sy);

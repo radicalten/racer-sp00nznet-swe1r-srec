@@ -149,7 +149,7 @@ stubs = [
     "func_80097D70",
     "func_80097DC0",
     # func_80097E60 is lldiv (used by _Litob): pure C, must NOT be stubbed (HUD numbers vanish)
-    "func_80097F68",
+    "rsp_blob_80097FE8",
     "libultra_split_8008D12C",
     "libultra_split_8008D284",
     "libultra_split_8008D450",

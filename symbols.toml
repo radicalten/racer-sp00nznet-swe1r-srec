@@ -4538,11 +4538,19 @@ size = 0x98000
   size = 0xA0
 
   [[section.functions]]
+  # lldiv
   name = "func_80097E60"
   vram = 0x80097E60
-  size = 0x108
+  size = 0x100
 
   [[section.functions]]
-  name = "func_80097F68"
-  vram = 0x80097F68
-  size = 0x498
+  # ldiv: used by _Ldtob to produce float digits (speedometer)
+  name = "ldiv_80097F60"
+  vram = 0x80097F60
+  size = 0x88
+
+  [[section.functions]]
+  # RSP code/data embedded in the CPU segment, not CPU code (stubbed)
+  name = "rsp_blob_80097FE8"
+  vram = 0x80097FE8
+  size = 0x418
