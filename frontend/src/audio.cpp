@@ -69,7 +69,7 @@ void queue_samples(int16_t* data, size_t count) {
     SDL_QueueAudio(g_device, out.data(), (Uint32)(count * sizeof(float)));
 }
 
-size_t get_frames_remaining() {
+size_t queued_frames() {
     if (det_enabled()) {
         if (!g_det_started || g_rate == 0) return 0;
         uint64_t played = (det_frame() - g_det_first_retrace) * g_rate / 60;
@@ -77,6 +77,14 @@ size_t get_frames_remaining() {
     }
     // (The runtime reports half a frame less than this, so the game mixes a little ahead.)
     return g_device ? SDL_GetQueuedAudioSize(g_device) / kBytesPerFrame : 0;
+}
+
+// Never report more than two video frames' worth. Real hardware never has more queued than that,
+// and games mix "a frame minus what's queued" in 16 bits: Racer's mixer wraps a big backlog (after a
+// hitch) into a huge positive count, overflows its command list and halts forever. Reporting
+// "plenty" makes the game mix its minimum, so a backlog drains on its own.
+size_t get_frames_remaining() {
+    return std::min(queued_frames(), (size_t)(g_rate / 30));
 }
 
 void set_frequency(uint32_t rate) {

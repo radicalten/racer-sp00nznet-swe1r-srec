@@ -468,6 +468,16 @@ static void print_stack(HANDLE thread, CONTEXT ctx, int max_frames) {
 }
 
 int main(int argc, char* argv[]) {
+    // Started from Explorer or a launcher (console window or none): keep the log, crash traces
+    // included, in swe1racer.log next to the exe. Piped or redirected output is left alone.
+    HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
+    if (err == nullptr || err == INVALID_HANDLE_VALUE || GetFileType(err) == FILE_TYPE_CHAR) {
+        char exe[MAX_PATH];
+        DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+        std::string log = std::string(exe, n);
+        log = log.substr(0, log.find_last_of("\\/") + 1) + "swe1racer.log";
+        freopen(log.c_str(), "w", stderr);
+    }
     // Force unbuffered output so we see prints before crashes
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
