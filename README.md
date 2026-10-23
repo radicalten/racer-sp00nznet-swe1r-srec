@@ -187,14 +187,15 @@ make progress
 
 ### Building
 
-The build expects three sibling checkouts next to this repo: [N64Recomp](https://github.com/sp00nznet/N64Recomp), [N64ModernRuntime](https://github.com/sp00nznet/N64ModernRuntime) and [rt64](https://github.com/sp00nznet/rt64) (the sp00nznet forks, which carry the fixes this port needs), plus SDL2 from vcpkg at `C:\vcpkg`.
+**The easy way:** the Racer installer from this repo's [Releases](../../releases) (built by [recomp-launcher](https://github.com/sp00nznet/recomp-launcher)) finds your ROM, builds everything and gives you a Play button. Or put your USA `.z64` in this folder and double-click **`Setup.cmd`**: it installs what's missing (Git, Python, CMake, the Visual Studio C++ build tools, after asking), fetches the toolkits into `deps/`, recompiles, builds, and leaves `Star Wars Episode I Racer (recomp).cmd` to play. `powershell -File tools\setup.ps1 -Yes -Game <folder>` runs it with no questions; a rerun resumes where it stopped, and `logs\setup.log` has the details. Nothing from the game is downloaded or committed: the build is made from your ROM on your machine.
+
+**By hand:** the build uses the toolkits in `deps/` if Setup fetched them, else three sibling checkouts next to this repo: [N64Recomp](https://github.com/sp00nznet/N64Recomp), [N64ModernRuntime](https://github.com/sp00nznet/N64ModernRuntime) and [rt64](https://github.com/sp00nznet/rt64) (the sp00nznet forks, which carry the fixes this port needs). SDL2 comes from RT64's bundled Windows build.
 
 ```bash
 # 0. Toolkit checkouts, side by side with this repo
 git clone --recursive https://github.com/sp00nznet/N64Recomp ../N64Recomp
 git clone --recursive https://github.com/sp00nznet/N64ModernRuntime ../N64ModernRuntime
 git clone --recursive https://github.com/sp00nznet/rt64 ../rt64
-vcpkg install sdl2:x64-windows
 
 # 1. Build N64Recomp (the recompiler tool)
 cmake -S ../N64Recomp -B ../N64Recomp/build -G "Visual Studio 17 2022" -A x64
@@ -205,7 +206,7 @@ mkdir RecompiledFuncs
 ../N64Recomp/build/Release/N64Recomp.exe recomp.toml
 python tools/fix_fallthroughs.py
 python tools/post_recomp_patches.py
-python tools/gen_lookup_table.py
+# (tools/gen_lookup_table.py regenerates the committed src/section_table.cpp after symbols.toml changes)
 
 # 3. Build the native executable
 cmake -B build -G "Visual Studio 17 2022" -A x64

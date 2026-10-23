@@ -16,6 +16,12 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+# The toolkits' deepest source files sit ~150 characters below this folder, and the C++ compiler
+# can't open paths past Windows' 260-character limit.
+if ($Root.Length -gt 100) {
+    Write-Host "Setup stopped: this folder's path is too long to build in ($($Root.Length) characters). Move it somewhere shorter, such as C:\Games\Racer, and run Setup again." -ForegroundColor Red
+    exit 1
+}
 New-Item -ItemType Directory -Force logs, deps | Out-Null
 $Log = Join-Path $Root "logs\setup.log"
 "Racer recomp setup, $(Get-Date)" | Out-File $Log -Encoding utf8
@@ -101,7 +107,10 @@ $target = Join-Path $Root "baserom.z64"
 $match = $null
 $searchDirs = @($Root) + $(if ($Game) { @($Game) } else { @() })
 foreach ($dir in $searchDirs) {
-    foreach ($f in Get-ChildItem -Path $dir -File -Include *.z64, *.n64, *.v64 -Recurse -Depth 1 -ErrorAction SilentlyContinue) {
+    # The folder itself, then its direct subfolders (Windows PowerShell ignores -Depth with -Include).
+    $files = @(Get-ChildItem -Path $dir -File -ErrorAction SilentlyContinue) +
+             @(Get-ChildItem -Path $dir -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-ChildItem -Path $_.FullName -File -ErrorAction SilentlyContinue })
+    foreach ($f in $files | Where-Object { $_.Extension -in ".z64", ".n64", ".v64" }) {
         $h = Read-Header $f.FullName
         if (-not $h) { continue }
         if ($h.Name -eq $Header -and $h.Crc -eq $Crc) { $match = $f.FullName; break }
