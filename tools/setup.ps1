@@ -159,6 +159,14 @@ Run "building the game failed" "cmake" @("--build", "build", "--config", "RelWit
 
 # ---------------------------------------------------------------------------------------------
 Step 7 "Making the launcher"
+# The exe won't start without these next to it (the build copies them; make sure).
+$bin = Join-Path $Root "build\RelWithDebInfo"
+$dlls = @{ "SDL2.dll" = "deps\rt64\src\contrib\mupen64plus-win32-deps\SDL2-2.26.3\lib\x64\SDL2.dll";
+           "dxil.dll" = "deps\rt64\src\contrib\dxc\bin\x64\dxil.dll"; "dxcompiler.dll" = "deps\rt64\src\contrib\dxc\bin\x64\dxcompiler.dll" }
+foreach ($d in $dlls.Keys) {
+    if (-not (Test-Path -LiteralPath (Join-Path $bin $d))) { Copy-Item -LiteralPath (Join-Path $Root $dlls[$d]) -Destination $bin }
+    if (-not (Test-Path -LiteralPath (Join-Path $bin $d))) { Stop-Setup "$d is missing next to the game, and copying it failed." }
+}
 $launcher = Join-Path $Root "$Title (recomp).cmd"
 "@echo off`r`ncd /d `"%~dp0`"`r`nstart `"`" `"build\RelWithDebInfo\SWE1Racer.exe`" %*`r`n" | Out-File $launcher -Encoding ascii
 Write-Host "  $Title (recomp).cmd"
