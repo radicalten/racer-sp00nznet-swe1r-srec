@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <cfloat>
 #include <cstdio>
 #include <memory>
@@ -363,6 +364,11 @@ void graphics_tab() {
     ImGui::Checkbox("Texture packs (restart to apply)", &g_config.texturePacks);
 }
 
+void sound_tab() {
+    int v = (int)std::lround(g_config.volume * 100);
+    if (ImGui::SliderInt("Volume", &v, 0, 100, "%d%%")) g_config.volume = v / 100.0;
+}
+
 void netplay_tab() {
     ImGui::SliderInt("Input delay (frames)", &g_config.netplayInputDelay, 0, 10);
     ImGui::TextDisabled("More delay hides more lag. The host's setting is used. 2 suits most connections.");
@@ -380,6 +386,7 @@ void settings() {
     if (ImGui::BeginTabBar("##tabs")) {
         if (tab("Controls")) { controls_tab(); ImGui::EndTabItem(); }
         if (tab("Graphics")) { graphics_tab(); ImGui::EndTabItem(); }
+        if (tab("Sound")) { sound_tab(); ImGui::EndTabItem(); }
         if (g_game.netplay && tab("Netplay")) { netplay_tab(); ImGui::EndTabItem(); }
         ImGui::EndTabBar();
         g_open_tab.clear();

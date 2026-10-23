@@ -41,3 +41,6 @@ deps/
 swe1racer.json
 netplay/
 saves/
+
+# Recompiled audio microcode (RSPRecomp rsp/aspMain.toml): derived from the ROM, never committed
+rsp/aspMain.cpp

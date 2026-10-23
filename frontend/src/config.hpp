@@ -34,6 +34,9 @@ struct Config {
     bool texturePacks = true;                      // load texture-packs/*.rtz and folders
     bool developerMode = false;                    // RT64 inspector (F1): texture dumping, debug views
 
+    // Sound
+    double volume = 0.8;                           // 0 (muted) to 1
+
     // Netplay
     int netplayInputDelay = 2;                     // frames of input delay (more hides more latency)
     int netplayPort = 7777;                        // UDP port the host listens on

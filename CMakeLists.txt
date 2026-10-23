@@ -73,8 +73,11 @@ add_subdirectory(frontend)
 add_executable(SWE1Racer
     src/main.cpp
     src/section_table.cpp
-    src/audio.cpp
+    rsp/aspMain.cpp
 )
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp")
+    message(FATAL_ERROR "rsp/aspMain.cpp is missing. Run: RSPRecomp rsp/aspMain.toml (tools/setup.ps1 does it)")
+endif()
 
 target_include_directories(SWE1Racer PRIVATE
     ${N64_MODERN_RUNTIME_DIR}/N64Recomp/include     # recomp.h

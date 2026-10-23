@@ -63,14 +63,14 @@ No existing N64 decompilation exists for this game. We're flying blind through B
 | **2-player netplay (deterministic lockstep, UDP)** | **WORKING (tested locally)** |
 | **In-game: tournament race on Boonta Training Course** | **COMPLETE** |
 | **Correct 4:3 presentation in every VI mode** | **COMPLETE** |
-| Audio Reimplementation | TODO |
+| Audio (aspMain via RSPRecomp, SDL output) | **COMPLETE** |
 | Playable Build | IN PROGRESS |
 
 **Current Progress: Phase 8 - In Game**
 
 *"Now THIS is podracing!"*
 
-The port now runs on current upstream N64Recomp, N64ModernRuntime and RT64 and plays from the intro through the title menu, tournament setup and into a race you can drive (no sound yet). The fixes were mostly libultra functions that had been stubbed or misidentified: `osSetThreadPri`, `osPiReadIo`, `osViSetMode`/`osViSwapBuffer`/`osViBlack`, `osViGetCurrentFramebuffer`, the EEPROM and controller functions, and `_Putfld` (sprintf). The runtime fixes needed for it are open as PRs on the sp00nznet forks of N64ModernRuntime (#1–#8) and RT64 (#1).
+The port now runs on current upstream N64Recomp, N64ModernRuntime and RT64 and plays from the intro through the title menu, tournament setup and into a race you can drive, with music and sound effects. The fixes were mostly libultra functions that had been stubbed or misidentified: `osSetThreadPri`, `osPiReadIo`, `osViSetMode`/`osViSwapBuffer`/`osViBlack`, `osViGetCurrentFramebuffer`, the EEPROM and controller functions, and `_Putfld` (sprintf). The runtime fixes needed for it are open as PRs on the sp00nznet forks of N64ModernRuntime (#1–#8) and RT64 (#1).
 
 Controls, settings and texture packs: see [Playing](#playing).
 
@@ -199,13 +199,15 @@ git clone --recursive https://github.com/sp00nznet/rt64 ../rt64
 
 # 1. Build N64Recomp (the recompiler tool)
 cmake -S ../N64Recomp -B ../N64Recomp/build -G "Visual Studio 17 2022" -A x64
-cmake --build ../N64Recomp/build --config Release --target N64RecompCLI
+cmake --build ../N64Recomp/build --config Release --target N64RecompCLI RSPRecomp
 
 # 2. Recompile the game (MIPS -> C) into RecompiledFuncs/ (generated, never committed)
 mkdir RecompiledFuncs
 ../N64Recomp/build/Release/N64Recomp.exe recomp.toml
 python tools/fix_fallthroughs.py
 python tools/post_recomp_patches.py
+# 2b. Recompile the audio microcode (libultra's aspMain) into rsp/aspMain.cpp (generated too)
+../N64Recomp/build/Release/RSPRecomp.exe rsp/aspMain.toml
 # (tools/gen_lookup_table.py regenerates the committed src/section_table.cpp after symbols.toml changes)
 
 # 3. Build the native executable
@@ -246,6 +248,7 @@ Settings change `swe1racer.json` (in the working directory, created on first run
 | input | `deadzone` | stick deadzone, `0.15` by default |
 | input | `players[0..3].device` | `auto` (default), `controller` (with `controller`: index), `keyboard`, `none` |
 | input | `controllerBindings` / `keyboardBindings` | N64 button name to a list of SDL inputs, e.g. `"A": ["a", "+righttrigger"]` or `"A": ["Space"]` |
+| audio | `volume` | `0` (muted) to `1`, `0.8` by default |
 | netplay | `inputDelay`, `port`, `address` | frames of input delay (host's wins), the UDP port to host on, the last address joined |
 
 ### Netplay (2 players, LAN or internet)
@@ -272,7 +275,7 @@ Drop RT64 texture packs (`.rtz` files or folders) into `texture-packs/` next to 
 
 ### Debug switches
 
-Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_UI=launcher|menu|settings[:Controls|Graphics|Netplay]` opens that screen at start, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
+Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_UI=launcher|menu|settings[:Controls|Graphics|Sound|Netplay]` opens that screen at start, `SWE1R_AUDIODUMP=<file>` also writes the sound as raw 16-bit stereo, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
 
 ## Project Structure
 
@@ -295,7 +298,6 @@ racer/
 ├── src/
 │   ├── main.cpp           # Entry point, SDL window, callbacks
 │   ├── section_table.cpp  # VRAM->function pointer lookup table
-│   └── audio.cpp          # Audio stubs (SDL playback TODO)
 ├── frontend/              # Shared with our other N64 recomps (game-agnostic)
 │   ├── include/frontend/frontend.hpp  # fe::GameInfo + fe::run: the whole API a game uses
 │   └── src/               # window/startup, config file, input, launcher + menu (ImGui over RT64),

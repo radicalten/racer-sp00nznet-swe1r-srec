@@ -93,6 +93,9 @@ void load_config(const std::filesystem::path& path) {
     read(g, "texturePacks", c.texturePacks);
     read(g, "developerMode", c.developerMode);
 
+    const json au = j.value("audio", json::object());
+    read(au, "volume", c.volume);
+
     const json np = j.value("netplay", json::object());
     read(np, "inputDelay", c.netplayInputDelay);
     read(np, "port", c.netplayPort);
@@ -141,6 +144,7 @@ void save_config() {
         { "deadzone", c.deadzone }, { "players", players },
         { "controllerBindings", c.controllerBindings }, { "keyboardBindings", c.keyboardBindings },
     };
+    out["audio"] = { { "volume", c.volume } };
     out["netplay"] = { { "inputDelay", c.netplayInputDelay }, { "port", c.netplayPort }, { "address", c.netplayAddress } };
     if (std::ofstream f{ g_path }) {
         f << out.dump(4) << "\n";

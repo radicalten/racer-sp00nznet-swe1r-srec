@@ -35,7 +35,7 @@ struct GameInfo {
 Bindings default_controller_bindings();
 Bindings default_keyboard_bindings();
 
-// Fills cfg's renderer, input, gfx, gfx-init and error-box callbacks (the game sets rsp, audio,
+// Fills cfg's renderer, audio, input, gfx, gfx-init and error-box callbacks (the game sets rsp,
 // threads and vi_callback), then runs the game. Shows the launcher unless started with --headless,
 // --play, --host [port] or --join address[:port]. Returns when the program exits.
 int run(const GameInfo& game, recomp::Configuration& cfg, int argc, char** argv);

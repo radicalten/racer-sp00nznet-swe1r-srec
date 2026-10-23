@@ -10,6 +10,7 @@
 #include <SDL.h>
 
 #include "ultramodern/input.hpp"
+#include "ultramodern/ultramodern.hpp"
 #include "ultramodern/renderer_context.hpp"
 
 namespace fe {
@@ -24,6 +25,9 @@ void start_game();                    // from the launcher, or at once without i
 void apply_window_config();           // fullscreen / monitor from g_config (main thread)
 void quit();
 std::string log_prefix();
+
+// audio.cpp
+ultramodern::audio_callbacks_t audio_callbacks();
 
 // input.cpp
 void input_init();

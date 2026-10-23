@@ -292,7 +292,12 @@ size = 0x98000
   [[section.functions]]
   name = "func_80007594"
   vram = 0x80007594
-  size = 0x194
+  size = 0x17C
+
+  [[section.functions]]
+  name = "func_80007710"
+  vram = 0x80007710
+  size = 0x18
 
   [[section.functions]]
   name = "func_80007728"
@@ -3570,12 +3575,27 @@ size = 0x98000
   [[section.functions]]
   name = "osRecvMesg"
   vram = 0x80087E80
-  size = 0x1FC
+  size = 0x140
 
   [[section.functions]]
-  name = "func_8008807C"
-  vram = 0x8008807C
-  size = 0x3C
+  name = "alHeapDBAlloc"
+  vram = 0x80087FC0
+  size = 0x60
+
+  [[section.functions]]
+  name = "alUnlink"
+  vram = 0x80088020
+  size = 0x30
+
+  [[section.functions]]
+  name = "alLink"
+  vram = 0x80088050
+  size = 0x24
+
+  [[section.functions]]
+  name = "func_80088074"
+  vram = 0x80088074
+  size = 0x44
 
   [[section.functions]]
   name = "func_800880B8"
@@ -3595,24 +3615,34 @@ size = 0x98000
   size = 0x40
 
   [[section.functions]]
-  name = "func_80088150"
+  name = "osAiSetFrequency"
   vram = 0x80088150
-  size = 0x0C
+  size = 0x160
 
   [[section.functions]]
-  name = "func_8008815C"
-  vram = 0x8008815C
-  size = 0x154
-
-  [[section.functions]]
-  name = "func_800882B0"
+  name = "osAiSetNextBuffer"
   vram = 0x800882B0
   size = 0xB0
 
   [[section.functions]]
-  name = "func_80088360"
+  name = "osVirtualToPhysical"
   vram = 0x80088360
-  size = 0xF0
+  size = 0x80
+
+  [[section.functions]]
+  name = "osAiGetLength"
+  vram = 0x800883E0
+  size = 0x10
+
+  [[section.functions]]
+  name = "func_800883F0"
+  vram = 0x800883F0
+  size = 0x8
+
+  [[section.functions]]
+  name = "func_800883F8"
+  vram = 0x800883F8
+  size = 0x58
 
   [[section.functions]]
   name = "func_80088450"
@@ -3647,7 +3677,22 @@ size = 0x98000
   [[section.functions]]
   name = "func_80088B70"
   vram = 0x80088B70
-  size = 0x5D4
+  size = 0x7C
+
+  [[section.functions]]
+  name = "func_80088BEC"
+  vram = 0x80088BEC
+  size = 0x8
+
+  [[section.functions]]
+  name = "func_80088BF4"
+  vram = 0x80088BF4
+  size = 0x8
+
+  [[section.functions]]
+  name = "func_80088BFC"
+  vram = 0x80088BFC
+  size = 0x548
 
   [[section.functions]]
   name = "func_80089144"
@@ -3787,10 +3832,15 @@ size = 0x98000
   [[section.functions]]
   name = "func_8008ACD8"
   vram = 0x8008ACD8
-  size = 0xD8
+  size = 0xC8
 
   [[section.functions]]
-  name = "func_8008ADB0"
+  name = "osAiGetStatus"
+  vram = 0x8008ADA0
+  size = 0x10
+
+  [[section.functions]]
+  name = "osSpTaskYielded"
   vram = 0x8008ADB0
   size = 0x80
 
@@ -3817,7 +3867,7 @@ size = 0x98000
   size = 0x44
 
   [[section.functions]]
-  name = "func_8008B190"
+  name = "osSpTaskYield"
   vram = 0x8008B190
   size = 0x20
 
@@ -4064,19 +4114,14 @@ size = 0x98000
   [[section.functions]]
   name = "func_8008E54C"
   vram = 0x8008E54C
-  size = 0x4A8
+  size = 0x4A4
 
   [[section.functions]]
-  # Split: jr ra stub (0x10) + osSetEventMesg (0xD8)
-  name = "func_8008E9F4_stub"
-  vram = 0x8008E9F4
-  size = 0x10
-
-  [[section.functions]]
-  # Standard libultra copy - dead code (zero call sites), game uses custom version at 0x8008AE30
-  name = "osSetEventMesg_unused_8008EA04"
-  vram = 0x8008EA04
-  size = 0xD8
+  # An audio filter's param handler (switch on the param; case 1 sets f->source). It starts with a
+  # scheduled addiu before the stack adjust; it is not a stub plus osSetEventMesg.
+  name = "func_8008E9F0"
+  vram = 0x8008E9F0
+  size = 0xEC
 
   [[section.functions]]
   name = "func_8008EADC"
@@ -4159,7 +4204,7 @@ size = 0x98000
   size = 0x90
 
   [[section.functions]]
-  name = "osSetIntMask"
+  name = "func_80090170"
   vram = 0x80090170
   size = 0x90
 
@@ -4179,14 +4224,19 @@ size = 0x98000
   size = 0xA0
 
   [[section.functions]]
-  name = "osAiSetFrequency"
+  name = "func_800903D0"
   vram = 0x800903D0
   size = 0x80
 
   [[section.functions]]
-  name = "osAiSetNextBuffer"
+  name = "func_80090450"
   vram = 0x80090450
-  size = 0x150
+  size = 0xB0
+
+  [[section.functions]]
+  name = "osSetIntMask"
+  vram = 0x80090500
+  size = 0xA0
 
   [[section.functions]]
   name = "func_800905A0"

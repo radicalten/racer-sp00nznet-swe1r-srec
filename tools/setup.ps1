@@ -137,19 +137,26 @@ foreach ($t in $Toolkits) {
 # ---------------------------------------------------------------------------------------------
 Step 4 "Building the recompiler"
 $recomp = Join-Path $Root "deps\N64Recomp\build\Release\N64Recomp.exe"
-if (-not (Test-Path $recomp)) {
+$rsprecomp = Join-Path $Root "deps\N64Recomp\build\Release\RSPRecomp.exe"
+if (-not (Test-Path $recomp) -or -not (Test-Path $rsprecomp)) {
     Run "configuring N64Recomp failed" "cmake" @("-S", "deps\N64Recomp", "-B", "deps\N64Recomp\build", "-G", "Visual Studio 17 2022", "-A", "x64")
-    Run "building N64Recomp failed" "cmake" @("--build", "deps\N64Recomp\build", "--config", "Release", "--target", "N64RecompCLI", "--parallel")
+    Run "building N64Recomp failed" "cmake" @("--build", "deps\N64Recomp\build", "--config", "Release", "--target", "N64RecompCLI", "RSPRecomp", "--parallel")
 }
 
 # ---------------------------------------------------------------------------------------------
 Step 5 "Recompiling your game (a minute or two)"
-if (-not (Test-Path "RecompiledFuncs\funcs.h")) {
+# Redone whenever the recompiler's inputs change (an update to symbols.toml or recomp.toml).
+$inputs = (Get-FileHash symbols.toml).Hash + (Get-FileHash recomp.toml).Hash + (Get-FileHash rsp\aspMain.toml).Hash
+$stamp = "RecompiledFuncs\inputs.txt"
+if (-not (Test-Path $stamp) -or (Get-Content $stamp) -ne $inputs -or -not (Test-Path "rsp\aspMain.cpp")) {
     if (Test-Path RecompiledFuncs) { Remove-Item -Recurse -Force RecompiledFuncs }
     New-Item -ItemType Directory RecompiledFuncs | Out-Null
     Run "recompiling failed" $recomp @("recomp.toml")
     Run "patching the recompiled code failed" "py" @("tools\fix_fallthroughs.py")
     Run "patching the recompiled code failed" "py" @("tools\post_recomp_patches.py")
+    # The audio microcode (libultra's aspMain) runs as recompiled C++ too.
+    Run "recompiling the audio microcode failed" $rsprecomp @("rsp\aspMain.toml")
+    $inputs | Out-File $stamp -Encoding ascii -NoNewline
 }
 
 # ---------------------------------------------------------------------------------------------

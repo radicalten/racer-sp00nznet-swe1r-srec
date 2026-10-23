@@ -61,7 +61,8 @@ static FuncEntry section_funcs[] = {
     { func_80007218, 0x6E18, 0x19C },
     { func_800073B4, 0x6FB4, 0xD4 },
     { func_80007488, 0x7088, 0x10C },
-    { func_80007594, 0x7194, 0x194 },
+    { func_80007594, 0x7194, 0x17C },
+    { func_80007710, 0x7310, 0x18 },
     { func_80007728, 0x7328, 0xF8 },
     { func_80007820, 0x7420, 0x268 },
     { func_80007A88, 0x7688, 0x90 },
@@ -713,20 +714,24 @@ static FuncEntry section_funcs[] = {
     { func_800879C4, 0x875C4, 0x2FC },
     { static_0_80087CC0, 0x878C0, 0xB0 },
     { func_80087D70, 0x87970, 0x110 },
-    { func_8008807C, 0x87C7C, 0x3C },
+    { alHeapDBAlloc, 0x87BC0, 0x60 },
+    { alUnlink, 0x87C20, 0x30 },
+    { alLink, 0x87C50, 0x24 },
+    { func_80088074, 0x87C74, 0x44 },
     { func_800880B8, 0x87CB8, 0x28 },
     { func_80088110, 0x87D10, 0x40 },
-    { func_80088150, 0x87D50, 0xC },
-    { func_8008815C, 0x87D5C, 0x154 },
-    { func_800882B0, 0x87EB0, 0xB0 },
-    { func_80088360, 0x87F60, 0xF0 },
+    { func_800883F0, 0x87FF0, 0x8 },
+    { func_800883F8, 0x87FF8, 0x58 },
     { func_80088450, 0x88050, 0x38 },
     { func_80088488, 0x88088, 0xB0 },
     { func_80088538, 0x88138, 0x298 },
     { cache_writeback_800887D0, 0x883D0, 0x300 },
     { cache_inval_80088AD0, 0x886D0, 0x50 },
     { func_80088B20, 0x88720, 0x50 },
-    { func_80088B70, 0x88770, 0x5D4 },
+    { func_80088B70, 0x88770, 0x7C },
+    { func_80088BEC, 0x887EC, 0x8 },
+    { func_80088BF4, 0x887F4, 0x8 },
+    { func_80088BFC, 0x887FC, 0x548 },
     { func_80089144, 0x88D44, 0x240 },
     { func_80089384, 0x88F84, 0x28C },
     { func_80089610, 0x89210, 0x60 },
@@ -745,10 +750,8 @@ static FuncEntry section_funcs[] = {
     { func_8008A690, 0x8A290, 0x24 },
     { dma_read_rom, 0x8A2B4, 0x5C },
     { func_8008A750, 0x8A350, 0x588 },
-    { func_8008ACD8, 0x8A8D8, 0xD8 },
-    { func_8008ADB0, 0x8A9B0, 0x80 },
+    { func_8008ACD8, 0x8A8D8, 0xC8 },
     { func_8008AEA0, 0x8AAA0, 0x11C },
-    { func_8008B190, 0x8AD90, 0x20 },
     { func_8008B1B0, 0x8ADB0, 0x168 },
     { func_8008B318, 0x8AF18, 0x10C },
     { func_8008B424, 0x8B024, 0x15C },
@@ -781,9 +784,8 @@ static FuncEntry section_funcs[] = {
     { func_8008DEA0, 0x8DAA0, 0x1D4 },
     { func_8008E074, 0x8DC74, 0x3AC },
     { func_8008E420, 0x8E020, 0x12C },
-    { func_8008E54C, 0x8E14C, 0x4A8 },
-    { func_8008E9F4_stub, 0x8E5F4, 0x10 },
-    { osSetEventMesg_unused_8008EA04, 0x8E604, 0xD8 },
+    { func_8008E54C, 0x8E14C, 0x4A4 },
+    { func_8008E9F0, 0x8E5F0, 0xEC },
     { func_8008EADC, 0x8E6DC, 0x328 },
     { func_8008EE04, 0x8EA04, 0xE0 },
     { func_8008EEE4, 0x8EAE4, 0x1D0 },
@@ -800,9 +802,12 @@ static FuncEntry section_funcs[] = {
     { func_8008FEB0, 0x8FAB0, 0xE8 },
     { func_8008FF98, 0x8FB98, 0x148 },
     { func_800900E0, 0x8FCE0, 0x90 },
+    { func_80090170, 0x8FD70, 0x90 },
     { func_80090200, 0x8FE00, 0xA0 },
     { func_800902A0, 0x8FEA0, 0x90 },
     { func_80090330, 0x8FF30, 0xA0 },
+    { func_800903D0, 0x8FFD0, 0x80 },
+    { func_80090450, 0x90050, 0xB0 },
     { func_800905A0, 0x901A0, 0x58 },
     { func_800905F8, 0x901F8, 0x3C },
     { func_80090634, 0x90234, 0x2C },
@@ -1346,11 +1351,9 @@ static FuncEntry section_funcs[] = {
     { static_0_80087080, 0x86C80, 0x0 },  // auto-detected
     { static_0_80087814, 0x87414, 0x0 },  // auto-detected
     { static_0_800879B8, 0x875B8, 0x0 },  // auto-detected
-    { static_0_80087FC0, 0x87BC0, 0x0 },  // auto-detected
-    { static_0_80088020, 0x87C20, 0x0 },  // auto-detected
-    { static_0_80088050, 0x87C50, 0x0 },  // auto-detected
     { static_0_800880AC, 0x87CAC, 0x0 },  // auto-detected
-    { static_0_800883E0, 0x87FE0, 0x0 },  // auto-detected
+    { static_0_800884E8, 0x880E8, 0x0 },  // auto-detected
+    { static_0_80088500, 0x88100, 0x0 },  // auto-detected
     { static_0_80088B00, 0x88700, 0x0 },  // auto-detected
     { static_0_80089290, 0x88E90, 0x0 },  // auto-detected
     { static_0_800894D0, 0x890D0, 0x0 },  // auto-detected
@@ -1363,26 +1366,29 @@ static FuncEntry section_funcs[] = {
     { static_0_8008AB84, 0x8A784, 0x0 },  // auto-detected
     { static_0_8008ABEC, 0x8A7EC, 0x0 },  // auto-detected
     { static_0_8008AC48, 0x8A848, 0x0 },  // auto-detected
-    { static_0_8008ADA0, 0x8A9A0, 0x0 },  // auto-detected
     { static_0_8008BF3C, 0x8BB3C, 0x0 },  // auto-detected
     { static_0_8008C738, 0x8C338, 0x0 },  // auto-detected
     { static_0_8008C900, 0x8C500, 0x0 },  // auto-detected
     { static_0_8008D410, 0x8D010, 0x0 },  // auto-detected
-    { static_0_8008D420, 0x8D020, 0x0 },  // auto-detected
-    { static_0_80090500, 0x90100, 0x0 },  // auto-detected
+    { static_0_8008D7D0, 0x8D3D0, 0x0 },  // auto-detected
+    { static_0_8008DD50, 0x8D950, 0x0 },  // auto-detected
+    { static_0_8008ED18, 0x8E918, 0x0 },  // auto-detected
+    { static_0_8008F34C, 0x8EF4C, 0x0 },  // auto-detected
+    { static_0_8008F950, 0x8F550, 0x0 },  // auto-detected
+    { static_0_8008FA60, 0x8F660, 0x0 },  // auto-detected
     { static_0_800905F0, 0x901F0, 0x0 },  // auto-detected
     { static_0_80091630, 0x91230, 0x0 },  // auto-detected
     { static_0_80091B68, 0x91768, 0x0 },  // auto-detected
     { static_0_80092250, 0x91E50, 0x0 },  // auto-detected
     { static_0_80092850, 0x92450, 0x0 },  // auto-detected
-    { static_0_800938F0, 0x934F0, 0x0 },  // auto-detected
-    { static_0_80093980, 0x93580, 0x0 },  // auto-detected
     { static_0_80093A90, 0x93690, 0x0 },  // auto-detected
     { static_0_80093DB0, 0x939B0, 0x0 },  // auto-detected
     { static_0_80093E3C, 0x93A3C, 0x0 },  // auto-detected
     { static_0_800941B0, 0x93DB0, 0x0 },  // auto-detected
     { static_0_800941D0, 0x93DD0, 0x0 },  // auto-detected
     { static_0_80095AA0, 0x956A0, 0x0 },  // auto-detected
+    { static_0_800963B4, 0x95FB4, 0x0 },  // auto-detected
+    { static_0_80096710, 0x96310, 0x0 },  // auto-detected
 };
 
 SectionTableEntry section_table[] = {
@@ -1391,7 +1397,7 @@ SectionTableEntry section_table[] = {
         0x80000400,  // ram_addr
         0x98000,  // size
         section_funcs,  // funcs
-        1378,  // num_funcs
+        1384,  // num_funcs
         nullptr,  // relocs (none for static code)
         0,  // num_relocs
         0,  // index

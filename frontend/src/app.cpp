@@ -207,6 +207,7 @@ int run(const GameInfo& game, recomp::Configuration& cfg, int argc, char** argv)
     }
 
     cfg.renderer_callbacks.create_render_context = create_render_context;
+    cfg.audio_callbacks = audio_callbacks();
     cfg.input_callbacks.poll_input = poll_input;
     cfg.input_callbacks.get_input = get_input;
     cfg.input_callbacks.set_rumble = input_set_rumble;

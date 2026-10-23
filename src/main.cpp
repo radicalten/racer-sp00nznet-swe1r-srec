@@ -48,10 +48,8 @@ extern const size_t num_sections;
 // The recompiled entrypoint function
 extern "C" void recomp_entrypoint(uint8_t* rdram, recomp_context* ctx);
 
-// From audio.cpp
-extern void swe1r_queue_samples(int16_t* samples, size_t num_samples);
-extern size_t swe1r_get_frames_remaining();
-extern void swe1r_set_frequency(uint32_t freq);
+// libultra's audio microcode, recompiled from the ROM by RSPRecomp (rsp/aspMain.toml)
+extern RspUcodeFunc aspMain;
 
 // RDRAM base — captured in on_game_init so the crash handler can translate
 // native fault addresses back into N64 virtual addresses.
@@ -140,13 +138,15 @@ RspUcodeFunc* get_rsp_microcode(const OSTask* task) {
                 rsp_call_count, task->t.type,
                 (uint32_t)task->t.ucode, (uint32_t)task->t.ucode_data);
     }
-    // Only non-graphics (audio) tasks reach here; no-op them for now.
+    // Graphics tasks go straight to RT64; audio tasks run the recompiled aspMain.
+    if (task->t.type == M_AUDTASK) return aspMain;
     return swe1r_noop_ucode;
 }
 
 // =============================================================================
 // Event Callbacks
 // =============================================================================
+
 
 void vi_callback() {
     // Called every VI interrupt
@@ -525,7 +525,6 @@ int main(int argc, char* argv[]) {
     recomp::Configuration cfg{};
     cfg.project_version = { 0, 2, 0, "-alpha" };
     cfg.rsp_callbacks.get_rsp_microcode = get_rsp_microcode;
-    cfg.audio_callbacks = { swe1r_queue_samples, swe1r_get_frames_remaining, swe1r_set_frequency };
     cfg.events_callbacks.vi_callback = vi_callback;
     cfg.threads_callbacks.get_game_thread_name = get_game_thread_name;
 
