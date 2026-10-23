@@ -145,6 +145,11 @@ bool input_get(int port, uint16_t* buttons, float* x, float* y) {
         }
         if (down) *buttons |= b.mask;
     }
+    static bool logged[4] = {};
+    if (s.pad && *buttons && !logged[port]) {
+        logged[port] = true;
+        printf("[input] port %d: first controller input (buttons 0x%04X)\n", port + 1, *buttons);
+    }
 
     if (keys) {
         auto held = [&](int dir) { for (SDL_Scancode k : g_stick_keys[dir]) if (keys[k]) return true; return false; };

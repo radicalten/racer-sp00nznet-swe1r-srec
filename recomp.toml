@@ -138,9 +138,9 @@ stubs = [
     "func_80096790",
     "func_80096930",
     "func_80096A08",
-    "func_80096BF0",
-    "func_80096E90",
-    "func_80097400",
+    # func_80096BF0 is _Litob (integer formatting for sprintf): pure C, must NOT be stubbed (HUD numbers vanish)
+    # func_80096E90 is _Genld (used by _Ldtob): pure C, must NOT be stubbed (HUD numbers vanish)
+    # func_80097400 is _Ldtob (float formatting): pure C, must NOT be stubbed (HUD numbers vanish)
     "osPiRaw_io",
     "pi_raw_start_dma",
     "osPiManager_candidate_800979F8",
@@ -148,7 +148,7 @@ stubs = [
     "func_80097D20",
     "func_80097D70",
     "func_80097DC0",
-    "func_80097E60",
+    # func_80097E60 is lldiv (used by _Litob): pure C, must NOT be stubbed (HUD numbers vanish)
     "func_80097F68",
     "libultra_split_8008D12C",
     "libultra_split_8008D284",

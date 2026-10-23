@@ -176,6 +176,8 @@ std::unique_ptr<ultramodern::renderer::RendererContext> create_render_context_ca
 ultramodern::gfx_callbacks_t::gfx_data_t create_gfx() {
     SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, "0");
+    // Keep reading controllers when the window isn't focused (remote desktop, a second monitor).
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "Failed to initialize SDL2: %s\n", SDL_GetError());
