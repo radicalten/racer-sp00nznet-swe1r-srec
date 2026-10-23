@@ -23,6 +23,7 @@ set(RT64_DIR "${default_rt64}" CACHE PATH "Path to RT64 renderer")
 # SDL2: the Windows build RT64 ships (RT64 links it by bare name from this folder)
 # =============================================================================
 set(SDL2_DIR_WIN "${RT64_DIR}/src/contrib/mupen64plus-win32-deps/SDL2-2.26.3")
+link_directories("${SDL2_DIR_WIN}/lib/x64")
 add_library(SDL2::SDL2 SHARED IMPORTED)
 set_target_properties(SDL2::SDL2 PROPERTIES
     IMPORTED_LOCATION "${SDL2_DIR_WIN}/lib/x64/SDL2.dll"
