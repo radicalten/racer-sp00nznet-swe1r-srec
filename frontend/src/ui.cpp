@@ -376,6 +376,22 @@ void netplay_tab() {
     g_config.netplayPort = std::clamp(g_config.netplayPort, 1, 65535);
 }
 
+void cheats_tab() {
+    auto list = cheats_list();
+    if (list.empty()) {
+        ImGui::TextWrapped("No cheats.cht next to the game. Put a GameShark code list there in Project64's "
+                           ".cht format (Project64 ships one per game in Config\\Cheats), then restart.");
+        return;
+    }
+    if (net::active()) ImGui::TextDisabled("Cheats are off during netplay.");
+    for (auto& c : list) {
+        bool on = c.enabled;
+        if (ImGui::Checkbox(c.name.c_str(), &on)) cheats_set(c.name, on);
+        if (!c.note.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", c.note.c_str());
+    }
+    ImGui::TextDisabled("Turning a cheat off doesn't undo what it already changed.");
+}
+
 void settings() {
     panel_begin("##settings", 36);
     heading("Settings", 1.4f);
@@ -388,6 +404,7 @@ void settings() {
         if (tab("Graphics")) { graphics_tab(); ImGui::EndTabItem(); }
         if (tab("Sound")) { sound_tab(); ImGui::EndTabItem(); }
         if (g_game.netplay && tab("Netplay")) { netplay_tab(); ImGui::EndTabItem(); }
+        if (tab("Cheats")) { cheats_tab(); ImGui::EndTabItem(); }
         ImGui::EndTabBar();
         g_open_tab.clear();
     }

@@ -273,9 +273,13 @@ How it works: N64ModernRuntime's deterministic mode (`ultramodern::det`) makes t
 
 Drop RT64 texture packs (`.rtz` files or folders) into `texture-packs/` next to the exe; they load in alphabetical order. No HD pack for the N64 version of Racer is known to exist yet. Packs made for other emulators (Rice / GLideN64 `hires_texture` format) can be converted with RT64's `texture_hasher` tool from a texture dump; see RT64's [TEXTURE-PACKS.md](https://github.com/rt64/rt64/blob/main/TEXTURE-PACKS.md).
 
+### Cheats
+
+Settings > Cheats lists GameShark codes from `cheats.cht` next to the exe, in Project64's `.cht` format; tick a code to turn it on (it's saved in the config). Setup copies Project64's Racer list there if Project64 is installed (`Config\Cheats\Star Wars Episode I - Racer (U).cht`); any list in that format works. That list includes no damage, infinite Truguts, all tracks and pods, and the game's own hidden cheat menu. Codes are applied once a frame, like the real GameShark (types 80/81, A0/A1, D0-D3, F0/F1 and 50). Netplay ignores cheats.
+
 ### Debug switches
 
-Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_UI=launcher|menu|settings[:Controls|Graphics|Sound|Netplay]` opens that screen at start, `SWE1R_AUDIODUMP=<file>` also writes the sound as raw 16-bit stereo, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
+Environment variables: `SWE1R_DISPLAY=<n>` overrides the monitor, `SWE1R_UI=launcher|menu|settings[:Controls|Graphics|Sound|Netplay|Cheats]` opens that screen at start, `SWE1R_AUDIODUMP=<file>` also writes the sound as raw 16-bit stereo, `SWE1R_AUTOPRESS="<sec>:<buttons hex>,..."` scripts button presses on port 1, `SWE1R_STACKDUMP=<sec>` prints every thread's stack, `SWE1R_PEEK=<addr,...>` prints RDRAM words with a stack dump or crash, and `SWE1R_WATCH=<addr>@<sec>` traps the first write to an RDRAM word. `--headless` runs with a hidden window.
 
 ## Project Structure
 

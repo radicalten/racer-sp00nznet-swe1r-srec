@@ -14,8 +14,8 @@
 #include "internal.hpp"
 
 namespace fe {
-namespace {
 uint8_t* g_rdram = nullptr;
+namespace {
 FILE* g_hashlog = nullptr;
 long long g_dump_frame = -1;
 bool g_hash_blocks = false;

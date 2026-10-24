@@ -55,7 +55,15 @@ ultramodern::input::connected_device_info_t device_info(int port);
 std::vector<std::string> local_addresses(); // IPv4 addresses to give the other player
 }
 
+// cheats.cpp
+struct Cheat { std::string name, note; bool enabled; };
+void cheats_load();                   // cheats.cht next to the exe; after load_config
+std::vector<Cheat> cheats_list();
+void cheats_set(const std::string& name, bool on); // also saves the config
+void cheats_apply();                  // game thread, once per controller poll
+
 // det.cpp
+extern uint8_t* g_rdram;
 void det_start(void (*then)(uint64_t));
 uint64_t det_hash_game_ram();
 
