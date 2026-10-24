@@ -387,7 +387,13 @@ void cheats_tab() {
     for (auto& c : list) {
         bool on = c.enabled;
         if (ImGui::Checkbox(c.name.c_str(), &on)) cheats_set(c.name, on);
-        if (!c.note.empty() && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", c.note.c_str());
+        if (!c.note.empty() && ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28); // notes are long single lines
+            ImGui::TextUnformatted(c.note.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
     }
     ImGui::TextDisabled("Turning a cheat off doesn't undo what it already changed.");
 }
